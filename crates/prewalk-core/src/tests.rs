@@ -290,3 +290,26 @@ fn live_config_and_restart_keep_their_owners() {
         "restart uses saved default"
     );
 }
+
+#[test]
+fn on_arms_like_the_bare_command() {
+    for command in ["", "on"] {
+        let mut input = facts(Event::Command {
+            command: command.into(),
+        });
+        assert!(
+            matches!(
+                decide(&input).actions.as_slice(),
+                [Action::Store {
+                    state: State::Arm { .. }
+                }]
+            ),
+            "/prewalk {command} arms"
+        );
+        input.branch = armed();
+        assert!(
+            matches!(decide(&input).actions.as_slice(), [Action::Notify { message }] if message == "Prewalk: already armed."),
+            "/prewalk {command} keeps an existing arm"
+        );
+    }
+}

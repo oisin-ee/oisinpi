@@ -28,8 +28,8 @@ and the list stays as it was.
 ## State
 
 Each change is saved as a `todo-state` entry on the session branch. There is no other state. So a resumed session,
-a `/tree` move, and calls made from inside codemode all see the list of the current branch. A widget shows the list,
-and `/todos` prints it.
+a `/tree` move, and calls made from inside codemode all see the list of the current branch. A widget shows the list
+while it has tasks, and `/todos` prints it.
 
 ## Reminder
 

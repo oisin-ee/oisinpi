@@ -5,7 +5,7 @@ import type {
   SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 import { REMINDER_ENTRY, reminder } from "./reminder.ts";
-import { parse, view } from "./wasm.ts";
+import { parse, view, widget } from "./wasm.ts";
 import { isOwnSource } from "./source.ts";
 import { latestSnapshot } from "./state.ts";
 
@@ -34,12 +34,12 @@ interface TodoHost {
 const ownsTodo = (pi: TodoHost): boolean =>
     pi.getAllTools().some((tool) => tool.name === "todo" && isOwnSource(tool.sourceInfo.path)),
   /**
-   * Renders the selected branch snapshot.
+   * Renders the selected branch snapshot, and removes the widget when the list is empty.
    * @param {TodoContext} ctx Branch and UI methods.
    */
   replay = (ctx: TodoContext): void => {
     const list = parse(latestSnapshot(ctx.sessionManager.getBranch()));
-    ctx.ui.setWidget("pi-todo", view(list).split("\n"));
+    ctx.ui.setWidget("pi-todo", widget(list));
   },
   /**
    * Applies the completion decision at pi's final actionable boundary.

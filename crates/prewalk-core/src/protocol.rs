@@ -357,10 +357,12 @@ fn command(facts: &Facts, command: &str, cycle: &Cycle<'_>) -> Decision {
     match command {
         "off" => off(facts, cycle),
         "status" => status(facts, cycle),
-        "" if matches!(cycle.state, Some(State::Arm { .. })) => notice("Prewalk: already armed."),
-        "" => arm(facts, None),
+        "" | "on" if matches!(cycle.state, Some(State::Arm { .. })) => {
+            notice("Prewalk: already armed.")
+        }
+        "" | "on" => arm(facts, None),
         "restart" => restart(facts, cycle),
-        _ => notice("Usage: /prewalk [off|restart|status]"),
+        _ => notice("Usage: /prewalk [on|off|restart|status]"),
     }
 }
 

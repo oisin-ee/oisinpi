@@ -19,6 +19,7 @@ export {
   init,
   parse,
   view,
+  widget,
 } from "./generated/todo_core.js";
 export type {
   Operation,

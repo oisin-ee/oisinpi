@@ -64,3 +64,13 @@ pub fn completion_reminder(facts: &Ts<ReminderHistory>) -> Result<Option<String>
 pub fn view(list: &Ts<TodoList>) -> Result<String, JsError> {
     Ok(todo_core::view(&list.to_rust()?))
 }
+
+/// The widget lines for `list`, or `undefined` for an empty list.
+///
+/// # Errors
+///
+/// Throws when `list` is not a valid todo list.
+#[wasm_bindgen]
+pub fn widget(list: &Ts<TodoList>) -> Result<Option<Vec<String>>, JsError> {
+    Ok(todo_core::widget(&list.to_rust()?))
+}
