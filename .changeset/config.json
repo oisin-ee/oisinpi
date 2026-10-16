@@ -1,0 +1,11 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@4.0.1/schema.json",
+  "baseBranch": "main",
+  "access": "public",
+  "changelog": ["@changesets/changelog-github", { "repo": "oisin-ee/pi-prewalk" }],
+  "commit": false,
+  "ignore": [],
+  "fixed": [["@oisin-ee/pi-todo", "@oisin-ee/pi-prewalk", "@oisin-ee/pi-prewalk-kit"]],
+  "linked": [],
+  "updateInternalDependencies": "patch"
+}

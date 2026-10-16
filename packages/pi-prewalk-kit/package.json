@@ -1,0 +1,33 @@
+{
+  "name": "@oisin-ee/pi-prewalk-kit",
+  "version": "0.0.0",
+  "description": "pi-prewalk and pi-todo in one install: a frontier model plans, a cheaper model finishes.",
+  "keywords": [
+    "pi-extension",
+    "pi-package",
+    "prewalk",
+    "todo"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oisin-ee/pi-prewalk.git",
+    "directory": "packages/pi-prewalk-kit"
+  },
+  "type": "module",
+  "dependencies": {
+    "@oisin-ee/pi-prewalk": "workspace:*",
+    "@oisin-ee/pi-todo": "workspace:*"
+  },
+  "bundleDependencies": [
+    "@oisin-ee/pi-prewalk",
+    "@oisin-ee/pi-todo"
+  ],
+  "pi": {
+    "extensions": [
+      "./node_modules/@oisin-ee/pi-todo/src/index.ts",
+      "./node_modules/@oisin-ee/pi-prewalk/src/index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/oisin-ee/pi-prewalk/main/assets/prewalk.png"
+  }
+}
