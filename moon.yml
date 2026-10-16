@@ -1,0 +1,18 @@
+$schema: https://moonrepo.dev/schemas/project.json
+language: javascript
+toolchains:
+  default: javascript
+tasks:
+  # Every file type Oxfmt supports, inside and outside the projects.
+  format:
+    command: oxfmt --check
+    inputs: ["/**/*", "!**/node_modules/**/*", "!/target/**/*", "!/packages/*/src/generated/**/*"]
+    tags: [precommit]
+  # `moon run :fix` formats the tree. It writes sources, so it never caches
+  # and never runs in CI.
+  fix:
+    command: oxfmt
+    options:
+      cache: false
+      runInCI: false
+      mutex: source-fix

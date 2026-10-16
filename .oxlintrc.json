@@ -1,0 +1,99 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // Every category at error, with no preset. A rule is off only where another
+  // enabled rule or a pi requirement contradicts it, and each one says why.
+  // Options that only name third-party APIs keep a rule on for this code.
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "pedantic": "error",
+    "perf": "error",
+    "style": "error",
+    "restriction": "error",
+    "nursery": "error"
+  },
+  // `plugins` replaces the default set. The UI plugins (react, react-perf,
+  // jsx-a11y, nextjs, vue) and jest have no code in this repository. vitest
+  // applies to the test files only (overrides).
+  "plugins": ["eslint", "typescript", "unicorn", "oxc", "import", "node", "promise", "jsdoc"],
+  // pi runs extensions under Node or Bun.
+  "env": { "node": true },
+  "options": {
+    "typeAware": true,
+    // Reports TypeScript errors, so there is no separate `tsc` step.
+    "typeCheck": true,
+    "denyWarnings": true,
+    "reportUnusedDisableDirectives": "error"
+  },
+  "ignorePatterns": ["packages/*/src/generated/**"],
+  "rules": {
+    // Contradicts import/no-default-export, which stays on.
+    "import/no-named-export": "off",
+    // Contradicts import/no-default-export, which stays on.
+    "import/prefer-default-export": "off",
+    // Contradicts unicorn/prefer-ternary, which stays on.
+    "eslint/no-ternary": "off",
+    // Contradicts promise/prefer-await-to-then, which stays on.
+    "oxc/no-async-await": "off",
+    // Contradicts typescript/promise-function-async, which stays on: a pi tool
+    // `execute` must return a promise, and one with nothing to await is async.
+    "eslint/require-await": "off",
+    // The type-aware form of the same rule; the same contradiction.
+    "typescript/require-await": "off",
+    // import/consistent-type-specifier-style puts types in their own import.
+    "eslint/no-duplicate-imports": ["error", { "allowSeparateTypeImports": true }],
+    // pi's `context_edit` entries need `replacement: null` (ContextEditEntry).
+    "unicorn/no-null": "off",
+    // typebox's `Type.*` and pi-ai's `StringEnum` are factories, not classes.
+    "eslint/new-cap": [
+      "error",
+      { "capIsNewExceptionPattern": "^Type\\.", "capIsNewExceptions": ["StringEnum"] }
+    ],
+    // pi's API types and the types wasm-bindgen generates from the Rust core
+    // are mutable by declaration; the rule stays on for every other type.
+    "typescript/prefer-readonly-parameter-types": [
+      "error",
+      {
+        "allow": [
+          {
+            "from": "package",
+            "package": "@earendil-works/pi-coding-agent",
+            "name": [
+              "AgentToolUpdateCallback",
+              "ExtensionAPI",
+              "ExtensionContext",
+              "ExtensionToolContext",
+              "SessionEntry"
+            ]
+          },
+          { "from": "lib", "name": "AbortSignal" },
+          { "from": "file", "name": ["Status", "Task", "TodoList"] }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      // pi loads an extension through its default export (docs/extensions.md),
+      // and a tool's `execute` has five parameters, the last being the context.
+      "files": ["packages/*/src/index.ts"],
+      "rules": { "import/no-default-export": "off", "eslint/max-params": "off" }
+    },
+    {
+      // The only modules that read files: the WASM bytes and the config. The
+      // extension factory is synchronous, so the core loads synchronously.
+      "files": ["packages/*/src/wasm.ts", "packages/*/src/config.ts"],
+      "rules": { "import/no-nodejs-modules": "off", "node/no-sync": "off" }
+    },
+    {
+      "files": ["**/*.test.ts"],
+      "plugins": ["vitest"],
+      "rules": {
+        // Contradicts vitest/prefer-importing-vitest-globals, which stays on:
+        // tests import `describe`, `it`, and `expect`, so they are typed
+        // without vitest's globals mode.
+        "vitest/no-importing-vitest-globals": "off"
+      }
+    }
+  ]
+}

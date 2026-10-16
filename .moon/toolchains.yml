@@ -1,0 +1,16 @@
+$schema: https://moonrepo.dev/schemas/toolchains.json
+# Moon installs the workspace dependencies; Proto owns the Node and pnpm
+# versions (`.prototools`).
+javascript:
+  packageManager: pnpm
+  dedupeOnLockfileChange: false
+  inferTasksFromScripts: false
+  syncPackageManagerField: false
+  syncProjectWorkspaceDependencies: false
+node:
+  versionFromPrototools: false
+pnpm:
+  versionFromPrototools: false
+  installArgs: [--frozen-lockfile]
+proto:
+  version: "0.63.1"

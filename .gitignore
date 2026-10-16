@@ -1,0 +1,12 @@
+node_modules/
+target/
+coverage/
+.worktrees/
+.moon/cache/
+.moon/docker/
+# Written by the `*-wasm:build` tasks and published in the npm tarball.
+packages/*/src/generated/
+*.log
+.DS_Store
+# moon writes the Git hooks from `vcs.hooks` on every run
+/.moon/hooks/

@@ -1,0 +1,21 @@
+$schema: https://moonrepo.dev/schemas/workspace.json
+versionConstraint: "=2.6.1"
+# These roots mirror pnpm-workspace.yaml and Cargo.toml.
+defaultProject: workspace
+projects:
+  workspace: "."
+  todo-core: crates/todo-core
+  todo-wasm: crates/todo-wasm
+  pi-todo: packages/pi-todo
+vcs:
+  defaultBranch: main
+  # Moon writes `.moon/hooks` and points `core.hooksPath` at it on every
+  # `moon run`. Pre-commit only checks; `moon run :fix` repairs.
+  sync: true
+  hooks:
+    pre-commit:
+      - moon run :#precommit --affected --status staged
+pipeline:
+  syncProjects: false
+  logRunningCommand: true
+telemetry: false
