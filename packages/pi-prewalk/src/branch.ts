@@ -66,3 +66,4 @@ const calls = (result: CallEvidence): Call[] => [
     entries.flatMap((entry) => entryRecords(entry));
 
 export { branchRecords, calls };
+export type { CallEvidence };

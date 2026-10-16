@@ -4,7 +4,7 @@ import {
   getAgentDir,
 } from "@earendil-works/pi-coding-agent";
 import type { ConfigReport } from "./wasm.ts";
-import type { Context } from "./adapter.ts";
+import type { Context } from "./ports.ts";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import { configure } from "./wasm.ts";
 import path from "node:path";

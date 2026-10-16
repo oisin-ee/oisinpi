@@ -1,5 +1,5 @@
 import type { Api, Model, ToolResultMessage } from "@earendil-works/pi-ai";
-import type { Context, Host } from "./adapter.ts";
+import type { Context, Host } from "./ports.ts";
 import type { SessionBoundaryDraft, SessionEntry, ToolInfo } from "@earendil-works/pi-coding-agent";
 import { Adapter } from "./adapter.ts";
 import { calls } from "./branch.ts";
@@ -15,7 +15,7 @@ interface Replacement {
 }
 /** Read-only observations and explicit test-session operations. */
 interface Harness {
-  readonly adapter: Pick<Adapter, "run" | "newSession">;
+  readonly adapter: Pick<Adapter, "run" | "newSession" | "turn">;
   readonly apply: (entries: readonly SessionBoundaryDraft[] | undefined) => void;
   readonly branch: readonly SessionEntry[];
   readonly config: (source: string) => void;
@@ -66,7 +66,9 @@ class Session {
       entry.type === "custom_message" ||
       entry.type === "context_edit"
     ) {
-      this.#branch.push(Object.assign({ id: crypto.randomUUID(), parentId: null, timestamp: "" }, entry));
+      this.#branch.push(
+        Object.assign({ id: crypto.randomUUID(), parentId: null, timestamp: "" }, entry),
+      );
     }
   }
 

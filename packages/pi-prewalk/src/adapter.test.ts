@@ -1,8 +1,7 @@
 import { arm, harness, nudge, result, turn } from "./fixture.ts";
 import { describe, expect, it } from "vitest";
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
-import { branchRecords } from "./branch.ts";
-import { project } from "./wasm.ts";
+import { projectContext } from "./projection.ts";
 
 const ONE = 1,
   NUDGE = 1;
@@ -76,7 +75,6 @@ describe("nested gate", () => {
       entries: [{ customType: "prewalk-continue", display: false }],
     });
     await expect(test.adapter.run({ kind: "settle" }, test.ctx, [])).resolves.toStrictEqual({
-      continue: false,
       entries: [],
     });
   });
@@ -89,7 +87,17 @@ describe("prewalk cancellation", () => {
     await nudge(test);
     await test.adapter.run({ command: "off", kind: "command" }, test.ctx);
     expect(test.selections).toStrictEqual([]);
-    expect(project({ records: branchRecords(test.branch) }).keep_plan).toBe(false);
+    expect(
+      projectContext(test.branch, [
+        {
+          content: "plan",
+          customType: "prewalk-plan",
+          display: false,
+          role: "custom",
+          timestamp: 0,
+        },
+      ]).messages,
+    ).toStrictEqual([]);
     const boundary = await test.adapter.run({ kind: "settle" }, test.ctx, []);
     expect(boundary.entries).toStrictEqual([
       { replacement: null, targetId: test.branch[NUDGE]?.id, type: "context_edit" },
@@ -99,7 +107,9 @@ describe("prewalk cancellation", () => {
       entries: [],
     });
   });
+});
 
+describe("live config", () => {
   it("re-reads config at input and cancels after a live disable", { timeout: 5000 }, async () => {
     expect.hasAssertions();
     const test = harness();

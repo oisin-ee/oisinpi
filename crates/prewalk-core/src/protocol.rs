@@ -175,7 +175,7 @@ fn start(facts: &Facts, reason: &str, flags: &Flags, cycle: &Cycle<'_>) -> Decis
         || facts
             .branch
             .iter()
-            .any(|entry| matches!(entry, Record::User));
+            .any(|entry| matches!(entry, Record::User | Record::State { .. }));
     if resumed || flags.no_prewalk {
         return off(facts, cycle);
     }
@@ -186,8 +186,29 @@ fn start(facts: &Facts, reason: &str, flags: &Flags, cycle: &Cycle<'_>) -> Decis
     }
 }
 
+fn handoff(branch: &[Record]) -> Cycle<'_> {
+    for (index, record) in branch.iter().enumerate().rev() {
+        if let Record::State { state } = record {
+            match state {
+                State::Arm { .. } => break,
+                State::Handoff { .. } => {
+                    return Cycle {
+                        state: Some(state),
+                        tail: branch.get(index + 1..).unwrap_or_default(),
+                    };
+                }
+                State::Off { .. } => {}
+            }
+        }
+    }
+    Cycle {
+        state: None,
+        tail: branch,
+    }
+}
+
 fn new_session(facts: &Facts) -> Decision {
-    let previous = replay(&facts.previous);
+    let previous = handoff(&facts.previous);
     let mut decision = Decision::default();
     let mut fresh = facts.clone();
     if let Some(State::Handoff { planner, .. }) = previous.state

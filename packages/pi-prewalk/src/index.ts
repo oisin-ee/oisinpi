@@ -5,48 +5,28 @@ import type {
   SessionStartEvent,
   TurnEndEvent,
 } from "@earendil-works/pi-coding-agent";
-import { branchRecords, calls } from "./branch.ts";
 import { previousBranch, readConfig } from "./config.ts";
 import { Adapter } from "./adapter.ts";
-import { project } from "./wasm.ts";
+import { projectContext } from "./projection.ts";
 
 /**
  * Registers actionable boundaries and context projection.
  * @param {ExtensionAPI} pi Host API.
  * @param {Adapter} adapter Protocol adapter.
  */
-const LAST = -1,
-  boundaries = (pi: ExtensionAPI, adapter: Adapter): void => {
-    pi.on("turn_end", async (event: Readonly<TurnEndEvent>, ctx) =>
-      event.outcome === "completed" && event.message.role === "assistant"
-        ? adapter.run(
-            { calls: event.toolResults.flatMap((result) => calls(result)), kind: "turn" },
-            ctx,
-            event.entries,
-          )
-        : undefined,
-    );
-    pi.on("agent_before_settle", async (event: Readonly<AgentBeforeSettleEvent>, ctx) =>
-      event.outcome === "completed"
-        ? adapter.run({ kind: "settle" }, ctx, event.entries)
-        : undefined,
-    );
-    pi.on("context", (event: Readonly<ContextEvent>, ctx) => {
-      const projection = project({ records: branchRecords(ctx.sessionManager.getBranch()) }),
-        nudges = event.messages.filter(
-          (message) => message.role === "custom" && message.customType === "prewalk-plan",
-        ),
-        latest = nudges.at(LAST);
-      return {
-        messages: event.messages.filter(
-          (message) =>
-            message.role !== "custom" ||
-            message.customType !== "prewalk-plan" ||
-            (projection.keep_plan && message === latest),
-        ),
-      };
-    });
-  };
+const boundaries = (pi: ExtensionAPI, adapter: Adapter): void => {
+  pi.on("turn_end", async (event: Readonly<TurnEndEvent>, ctx) =>
+    event.outcome === "completed" && event.message.role === "assistant"
+      ? adapter.turn(event, ctx)
+      : undefined,
+  );
+  pi.on("agent_before_settle", async (event: Readonly<AgentBeforeSettleEvent>, ctx) =>
+    event.outcome === "completed" ? adapter.run({ kind: "settle" }, ctx, event.entries) : undefined,
+  );
+  pi.on("context", (event: Readonly<ContextEvent>, ctx) =>
+    projectContext(ctx.sessionManager.getBranch(), event.messages),
+  );
+};
 
 /**
  * Registers prewalk flags, lifecycle, commands, and boundaries.

@@ -221,6 +221,13 @@ fn new_restores_only_without_a_later_selection() {
         matches!(result.actions.first(), Some(Action::Select { selection: value }) if value.model == "test/planner"),
         "restore from old session, not fresh runtime"
     );
+    input.previous.push(Record::State {
+        state: State::Off { enabled: false },
+    });
+    assert!(
+        matches!(decide(&input).actions.first(), Some(Action::Select { .. })),
+        "off after handoff does not replace the model"
+    );
     input.previous.push(Record::Selection);
     assert!(
         !decide(&input)

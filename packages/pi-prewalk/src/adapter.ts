@@ -1,41 +1,10 @@
 import type { Action, ConfigReport, Event, Facts, Selection, State } from "./wasm.ts";
 import type { Api, Model } from "@earendil-works/pi-ai";
-import type {
-  BoundaryResult,
-  ExtensionAPI,
-  ExtensionContext,
-  SessionBoundaryDraft,
-  SessionEntry,
-} from "@earendil-works/pi-coding-agent";
-import { branchRecords } from "./branch.ts";
+import type { BoundaryResult, SessionBoundaryDraft } from "@earendil-works/pi-coding-agent";
+import type { Context, Files, Host } from "./ports.ts";
+import { branchRecords, calls } from "./branch.ts";
+import type { CallEvidence } from "./branch.ts";
 import { decide } from "./wasm.ts";
-
-/** Session authority used by this adapter. */
-type Host = Pick<
-  ExtensionAPI,
-  | "appendEntry"
-  | "sendMessage"
-  | "getAllTools"
-  | "getActiveTools"
-  | "getSettings"
-  | "getThinkingLevel"
-  | "setThinkingLevel"
-  | "setModel"
->;
-/** Data read from pi. */
-interface Context {
-  readonly cwd: string;
-  readonly isProjectTrusted: () => boolean;
-  readonly sessionManager: Pick<ExtensionContext["sessionManager"], "getBranch">;
-  readonly model: ExtensionContext["model"];
-  readonly ui: Pick<ExtensionContext["ui"], "notify">;
-  readonly modelRegistry: Pick<ExtensionContext["modelRegistry"], "getAvailable">;
-}
-/** File readers injected for adapter tests. */
-interface Files {
-  readonly config: (ctx: Context) => ConfigReport;
-  readonly previous: (path: string) => readonly SessionEntry[];
-}
 
 /**
  * Resolves an exact qualified ID with configured credentials.
@@ -57,7 +26,9 @@ const model = (id: string, ctx: Context): Model<Api> | undefined =>
     if (selected && state.kind === "handoff") {
       return Object.assign({}, state, { target: selected });
     }
-    return selected && state.kind === "arm" ? Object.assign({}, state, { planner: selected }) : state;
+    return selected && state.kind === "arm"
+      ? Object.assign({}, state, { planner: selected })
+      : state;
   },
   /**
    * Maps one action to a pi draft.
@@ -129,7 +100,6 @@ class Adapter {
   }
 
   /**
-   * Builds environment facts from current session data.
    * @param {Event} event Protocol event.
    * @param {Context} ctx Context.
    * @returns {Facts} Boundary input.
@@ -165,7 +135,6 @@ class Adapter {
   }
 
   /**
-   * Resolves the saved default for restart.
    * @param {Context} ctx Context.
    * @returns {Selection | undefined} Usable default.
    */
@@ -191,7 +160,6 @@ class Adapter {
   }
 
   /**
-   * Applies one protocol event.
    * @param {Event} event Event.
    * @param {Context} ctx Context.
    * @param {readonly SessionBoundaryDraft[] | undefined} prior Existing boundary drafts.
@@ -205,6 +173,33 @@ class Adapter {
     const facts = this.#facts(event, ctx);
     this.#errors(facts.report, ctx);
     return this.#apply(facts, ctx, prior);
+  }
+
+  /**
+   * Excludes this turn's persisted results from the historical gate evidence.
+   * @param {TurnEndEvent} event Completed turn.
+   * @param {Context} ctx Context.
+   * @returns {Promise<BoundaryResult>} Boundary result.
+   */
+  public async turn(
+    event: Readonly<{
+      toolResults: readonly CallEvidence[];
+      toolResultEntryIds: readonly string[];
+      entries: readonly SessionBoundaryDraft[];
+    }>,
+    ctx: Context,
+  ): Promise<BoundaryResult> {
+    const facts = this.#facts(
+      { calls: event.toolResults.flatMap((result) => calls(result)), kind: "turn" },
+      ctx,
+    );
+    facts.branch = branchRecords(
+      ctx.sessionManager
+        .getBranch()
+        .filter((entry) => !event.toolResultEntryIds.includes(entry.id)),
+    );
+    this.#errors(facts.report, ctx);
+    return this.#apply(facts, ctx, event.entries);
   }
 
   /**
@@ -292,9 +287,8 @@ class Adapter {
     if (prior === undefined) {
       persist(this.#pi, entries);
     }
-    return { continue: decision.again, entries };
+    return decision.again ? { continue: true, entries } : { entries };
   }
 }
 
 export { Adapter };
-export type { Context, Files, Host };

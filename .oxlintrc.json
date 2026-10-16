@@ -1,10 +1,23 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   // All categories stay at error. Exceptions name their conflicting rule or pi API.
-  "categories": { "correctness": "error", "suspicious": "error", "pedantic": "error", "perf": "error", "style": "error", "restriction": "error", "nursery": "error" },
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "pedantic": "error",
+    "perf": "error",
+    "style": "error",
+    "restriction": "error",
+    "nursery": "error"
+  },
   "plugins": ["eslint", "typescript", "unicorn", "oxc", "import", "node", "promise", "jsdoc"],
   "env": { "node": true },
-  "options": { "typeAware": true, "typeCheck": true, "denyWarnings": true, "reportUnusedDisableDirectives": "error" },
+  "options": {
+    "typeAware": true,
+    "typeCheck": true,
+    "denyWarnings": true,
+    "reportUnusedDisableDirectives": "error"
+  },
   "ignorePatterns": ["packages/*/src/generated/**"],
   "rules": {
     // Contradict import/no-default-export, which stays on.
@@ -32,14 +45,61 @@
     // pi optional model fields and wasm-bindgen Option inputs require undefined.
     "eslint/no-undefined": "off",
     // TypeBox and pi-ai StringEnum are factories, not constructors.
-    "eslint/new-cap": ["error", { "capIsNewExceptionPattern": "^Type\\.", "capIsNewExceptions": ["StringEnum"] }],
+    "eslint/new-cap": [
+      "error",
+      { "capIsNewExceptionPattern": "^Type\\.", "capIsNewExceptions": ["StringEnum"] }
+    ],
     // pi APIs and tsify-generated types are mutable declarations.
-    "typescript/prefer-readonly-parameter-types": ["error", { "allow": [
-      { "from": "package", "package": "@earendil-works/pi-coding-agent", "name": ["AgentBeforeSettleEvent", "AgentToolUpdateCallback", "ExtensionAPI", "ExtensionCommandContext", "ExtensionContext", "ExtensionToolContext", "SessionBoundaryDraft", "SessionEntry", "SessionStartEvent", "SessionTreeEvent"] },
-      { "from": "package", "package": "@earendil-works/pi-ai", "name": ["Model", "ToolResultMessage"] },
-      { "from": "lib", "name": "AbortSignal" },
-      { "from": "file", "name": ["Action", "Call", "ConfigReport", "Decision", "Event", "Facts", "Flags", "Record", "Selection", "State", "Status", "Task", "Thinking", "TodoList"] }
-    ] }]
+    "typescript/prefer-readonly-parameter-types": [
+      "error",
+      {
+        "allow": [
+          {
+            "from": "package",
+            "package": "@earendil-works/pi-coding-agent",
+            "name": [
+              "AgentBeforeSettleEvent",
+              "AgentToolUpdateCallback",
+              "ExtensionAPI",
+              "ExtensionCommandContext",
+              "ExtensionContext",
+              "ExtensionToolContext",
+              "SessionBoundaryDraft",
+              "SessionEntry",
+              "SessionMessageEntry",
+              "ToolInfo",
+              "SessionStartEvent",
+              "SessionTreeEvent"
+            ]
+          },
+          {
+            "from": "package",
+            "package": "@earendil-works/pi-ai",
+            "name": ["Model", "ToolResultMessage"]
+          },
+          { "from": "lib", "name": "AbortSignal" },
+          {
+            "from": "file",
+            "name": [
+              "Action",
+              "Call",
+              "ConfigReport",
+              "Decision",
+              "Event",
+              "Facts",
+              "Flags",
+              "Record",
+              "Selection",
+              "State",
+              "Status",
+              "Task",
+              "Thinking",
+              "TodoList"
+            ]
+          }
+        ]
+      }
+    ]
   },
   "overrides": [
     {
@@ -49,7 +109,7 @@
     },
     {
       // pi invokes these callbacks with mutable message unions; context returns those same messages.
-      "files": ["packages/pi-prewalk/src/index.ts"],
+      "files": ["packages/pi-prewalk/src/index.ts", "packages/pi-prewalk/src/projection.ts"],
       "rules": { "typescript/prefer-readonly-parameter-types": "off" }
     },
     {
@@ -58,12 +118,14 @@
       "rules": { "import/no-nodejs-modules": "off", "node/no-sync": "off" }
     },
     {
-      "files": ["**/*.test.ts"], "plugins": ["vitest"],
+      "files": ["**/*.test.ts"],
+      "plugins": ["vitest"],
       "rules": {
         // Contradicts vitest/prefer-importing-vitest-globals, which stays on.
         "vitest/no-importing-vitest-globals": "off",
         // Contradict vitest/prefer-strict-boolean-matchers, which stays on.
-        "vitest/prefer-to-be-truthy": "off", "vitest/prefer-to-be-falsy": "off"
+        "vitest/prefer-to-be-truthy": "off",
+        "vitest/prefer-to-be-falsy": "off"
       }
     }
   ]
