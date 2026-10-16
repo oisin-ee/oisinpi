@@ -1,6 +1,6 @@
 {
   "name": "@oisin-ee/pi-prewalk-kit",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "pi-prewalk and pi-todo in one install: a frontier model plans, a cheaper model finishes.",
   "keywords": [
     "pi-extension",
