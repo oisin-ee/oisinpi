@@ -1,5 +1,14 @@
 # @oisin-ee/pi-prewalk-kit
 
+## 0.1.1
+
+### Patch Changes
+
+- [#8](https://github.com/oisin-ee/pi-prewalk/pull/8) [`785734f`](https://github.com/oisin-ee/pi-prewalk/commit/785734ff387908f263c9031d8b16392ece7198f5) Thanks [@momo-momokaya](https://github.com/apps/momo-momokaya)! - `/prewalk on` arms a handoff, the same as `/prewalk`. The todo widget is hidden while the list has no tasks.
+- Updated dependencies [[`785734f`](https://github.com/oisin-ee/pi-prewalk/commit/785734ff387908f263c9031d8b16392ece7198f5)]:
+  - @oisin-ee/pi-todo@0.1.1
+  - @oisin-ee/pi-prewalk@0.1.1
+
 ## 0.1.0
 
 ### Minor Changes
