@@ -6,6 +6,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { REMINDER_ENTRY, reminder } from "./reminder.ts";
 import { parse, view } from "./wasm.ts";
+import { isOwnSource } from "./source.ts";
 import { latestSnapshot } from "./state.ts";
 
 interface TodoContext {
@@ -25,14 +26,13 @@ interface TodoHost {
   }[];
 }
 
-const ownPath = decodeURIComponent(new URL("index.ts", import.meta.url).pathname),
-  /**
-   * Whether this source owns the todo registration.
-   * @param {TodoHost} pi Tool metadata reader.
-   * @returns {boolean} Whether this source won.
-   */
-  ownsTodo = (pi: TodoHost): boolean =>
-    pi.getAllTools().some((tool) => tool.name === "todo" && tool.sourceInfo.path === ownPath),
+/**
+ * Whether this source owns the todo registration.
+ * @param {TodoHost} pi Tool metadata reader.
+ * @returns {boolean} Whether this source won.
+ */
+const ownsTodo = (pi: TodoHost): boolean =>
+    pi.getAllTools().some((tool) => tool.name === "todo" && isOwnSource(tool.sourceInfo.path)),
   /**
    * Renders the selected branch snapshot.
    * @param {TodoContext} ctx Branch and UI methods.
