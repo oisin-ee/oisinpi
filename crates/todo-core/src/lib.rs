@@ -4,6 +4,12 @@
 //! addressed by their exact content, and after each change the first open task
 //! becomes the one active task.
 
+mod operations;
+mod reminder;
+
+pub use operations::{Change, Operation, Request, apply};
+pub use reminder::{ReminderFact, ReminderHistory, completion_reminder};
+
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
@@ -42,6 +48,8 @@ pub enum TodoError {
     MissingItems,
     EmptyTask,
     DuplicateTask(String),
+    MissingTask,
+    TaskNotFound(String),
 }
 
 impl fmt::Display for TodoError {
@@ -49,7 +57,11 @@ impl fmt::Display for TodoError {
         match self {
             Self::MissingItems => f.write_str("Missing items for init operation"),
             Self::EmptyTask => f.write_str("Missing task content"),
-            Self::DuplicateTask(content) => write!(f, "Duplicate task \"{content}\" in init list"),
+            Self::DuplicateTask(content) => write!(f, "Duplicate task \"{content}\" in list"),
+            Self::MissingTask => f.write_str("Missing task content for start operation"),
+            Self::TaskNotFound(content) => {
+                write!(f, "Task \"{content}\" not found; use exact task content")
+            }
         }
     }
 }

@@ -13,5 +13,18 @@ initSync({
   module: readFileSync(new URL("generated/todo_core_bg.wasm", import.meta.url)),
 });
 
-export { init, parse, view } from "./generated/todo_core.js";
-export type { Status, Task, TodoList } from "./generated/todo_core.js";
+export {
+  apply,
+  completion_reminder as completionReminder,
+  init,
+  parse,
+  view,
+} from "./generated/todo_core.js";
+export type {
+  Operation,
+  ReminderFact,
+  Request,
+  Status,
+  Task,
+  TodoList,
+} from "./generated/todo_core.js";

@@ -5,7 +5,7 @@
 //! JavaScript fails as an ordinary `Result` inside the function and leaks
 //! nothing (tsify README, "Why are the `wasm_abi` attributes deprecated").
 
-use todo_core::TodoList;
+use todo_core::{Change, ReminderHistory, Request, TodoList};
 use tsify::{Ts, Tsify};
 use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::{JsError, wasm_bindgen};
@@ -33,6 +33,26 @@ pub fn parse(
 ) -> Result<Ts<TodoList>, JsError> {
     let list: TodoList = Ts::<TodoList>::new_unchecked(snapshot).to_rust()?;
     Ok(list.into_ts()?)
+}
+
+/// Applies one validated operation.
+///
+/// # Errors
+///
+/// Throws for malformed input or a rejected operation.
+#[wasm_bindgen]
+pub fn apply(list: &Ts<TodoList>, request: &Ts<Request>) -> Result<Ts<Change>, JsError> {
+    Ok(todo_core::apply(list.to_rust()?, request.to_rust()?)?.into_ts()?)
+}
+
+/// Computes completion policy from branch facts.
+///
+/// # Errors
+///
+/// Throws for malformed facts.
+#[wasm_bindgen]
+pub fn completion_reminder(facts: &Ts<ReminderHistory>) -> Result<Option<String>, JsError> {
+    Ok(todo_core::completion_reminder(&facts.to_rust()?.facts))
 }
 
 /// The model-facing summary of `list`.

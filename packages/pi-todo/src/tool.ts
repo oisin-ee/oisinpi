@@ -1,12 +1,13 @@
 import { STATE_ENTRY, latestSnapshot } from "./state.ts";
-import { init, parse, view } from "./wasm.ts";
+import { apply, parse, view } from "./wasm.ts";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import type { TodoList } from "./wasm.ts";
 
 /** One `todo` call, as the schema in `index.ts` admits it. */
 interface TodoParams {
-  readonly op: "init" | "view";
+  readonly op: "init" | "start" | "done" | "drop" | "append" | "view";
   readonly items?: readonly string[];
+  readonly task?: string;
 }
 
 /** What a call reads from and writes to the session. */
@@ -38,13 +39,16 @@ const result = (list: TodoList): TodoResult => ({
    * @returns {TodoResult} The result for the model and the renderer.
    */
   runTodo = (params: TodoParams, session: TodoSession): TodoResult => {
-    if (params.op === "init") {
-      const list = init([...(params.items ?? [])]);
+    const current = parse(latestSnapshot(session.branch())),
+      { list, persist } = apply(current, {
+        items: params.items ? [...params.items] : params.items,
+        op: params.op,
+        task: params.task,
+      });
+    if (persist) {
       session.append(STATE_ENTRY, list);
-      return result(list);
     }
-    const snapshot = latestSnapshot(session.branch());
-    return result(parse(snapshot));
+    return result(list);
   };
 
 export { runTodo };

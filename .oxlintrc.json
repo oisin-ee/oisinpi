@@ -35,6 +35,8 @@
     "eslint/no-ternary": "off",
     // Contradicts promise/prefer-await-to-then, which stays on.
     "oxc/no-async-await": "off",
+    // Contradicts oxc/no-rest-spread-properties, which stays on.
+    "eslint/prefer-object-spread": "off",
     // Contradicts typescript/promise-function-async, which stays on: a pi tool
     // `execute` must return a promise, and one with nothing to await is async.
     "eslint/require-await": "off",
@@ -59,11 +61,16 @@
             "from": "package",
             "package": "@earendil-works/pi-coding-agent",
             "name": [
+              "AgentBeforeSettleEvent",
               "AgentToolUpdateCallback",
+              "ExtensionCommandContext",
               "ExtensionAPI",
               "ExtensionContext",
               "ExtensionToolContext",
-              "SessionEntry"
+              "SessionBoundaryDraft",
+              "SessionEntry",
+              "SessionStartEvent",
+              "SessionTreeEvent"
             ]
           },
           { "from": "lib", "name": "AbortSignal" },

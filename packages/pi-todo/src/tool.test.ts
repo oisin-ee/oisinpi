@@ -65,9 +65,41 @@ describe("todo init", () => {
     expect.hasAssertions();
     const { entries, session } = fake([]);
     expect(() => runTodo({ items: ["a", "a"], op: "init" }, session)).toThrow(
-      'Duplicate task "a" in init list',
+      'Duplicate task "a" in list',
     );
     expect(entries).toStrictEqual([]);
+  });
+});
+
+describe("todo changes", () => {
+  it.each([
+    { op: "start", status: "in_progress", task: "Fix" },
+    { op: "done", status: "completed", task: "Fix" },
+    { op: "drop", status: "abandoned", task: "Fix" },
+  ] as const)("persists $op and its exact snapshot", { timeout: 5000 }, ({ op, status, task }) => {
+    expect.hasAssertions();
+    const { entries, session } = fake([
+        {
+          tasks: [
+            { content: "Read", status: "in_progress" },
+            { content: "Fix", status: "pending" },
+          ],
+        },
+      ]),
+      result = runTodo({ op, task }, session);
+    expect(result.details.tasks).toContainEqual({ content: task, status });
+    expect(entries.toReversed().find((stored) => stored.type === "custom")).toMatchObject({
+      data: result.details,
+    });
+  });
+
+  it("appends atomically and normalizes", { timeout: 5000 }, () => {
+    expect.hasAssertions();
+    const { entries, session } = fake([{ tasks: [{ content: "Read", status: "completed" }] }]),
+      result = runTodo({ items: ["Fix"], op: "append" }, session);
+    expect(result.details.tasks).toContainEqual({ content: "Fix", status: "in_progress" });
+    expect(() => runTodo({ items: ["New", "Fix"], op: "append" }, session)).toThrow("Duplicate");
+    expect(entries).toMatchObject([{ customType: STATE_ENTRY }, { customType: STATE_ENTRY }]);
   });
 });
 
