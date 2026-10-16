@@ -1,6 +1,8 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  // All categories stay at error. Exceptions name their conflicting rule or pi API.
+  // Every category at error, with no preset. A rule is off only where another
+  // enabled rule or a pi requirement contradicts it, and each one says why.
+  // Options that only name third-party APIs keep a rule on for this code.
   "categories": {
     "correctness": "error",
     "suspicious": "error",
@@ -10,18 +12,24 @@
     "restriction": "error",
     "nursery": "error"
   },
+  // `plugins` replaces the default set. The UI plugins (react, react-perf,
+  // jsx-a11y, nextjs, vue) and jest have no code in this repository. vitest
+  // applies to the test files only (overrides).
   "plugins": ["eslint", "typescript", "unicorn", "oxc", "import", "node", "promise", "jsdoc"],
+  // pi runs extensions under Node or Bun.
   "env": { "node": true },
   "options": {
     "typeAware": true,
+    // Reports TypeScript errors, so there is no separate `tsc` step.
     "typeCheck": true,
     "denyWarnings": true,
     "reportUnusedDisableDirectives": "error"
   },
   "ignorePatterns": ["packages/*/src/generated/**"],
   "rules": {
-    // Contradict import/no-default-export, which stays on.
+    // Contradicts import/no-default-export, which stays on.
     "import/no-named-export": "off",
+    // Contradicts import/no-default-export, which stays on.
     "import/prefer-default-export": "off",
     // Contradicts unicorn/prefer-ternary, which stays on.
     "eslint/no-ternary": "off",
@@ -29,27 +37,36 @@
     "oxc/no-async-await": "off",
     // Contradicts oxc/no-rest-spread-properties, which stays on.
     "eslint/prefer-object-spread": "off",
-    // Contradict typescript/promise-function-async for pi's async tool contract.
+    // Contradicts typescript/promise-function-async, which stays on: a pi tool
+    // `execute` must return a promise, and one with nothing to await is async.
     "eslint/require-await": "off",
+    // The type-aware form of the same rule; the same contradiction.
     "typescript/require-await": "off",
     // import/consistent-type-specifier-style requires separate type imports.
     "eslint/no-duplicate-imports": ["error", { "allowSeparateTypeImports": true }],
-    // pi context_edit requires null.
+    // pi's `context_edit` entries need `replacement: null` (ContextEditEntry).
     "unicorn/no-null": "off",
     // Contradicts typescript/prefer-optional-chain, which stays on.
     "oxc/no-optional-chaining": "off",
-    // Contradicts eslint/no-use-before-define for dependent declarators.
+    // Contradicts eslint/no-use-before-define, which stays on: a declarator that
+    // uses another must follow it, whatever the alphabetical order.
     "eslint/sort-vars": "off",
-    // no-use-before-define keeps initializers after effects that supply their input.
+    // "consecutive": a declaration that reads the result of an earlier statement
+    // must follow that statement, so it cannot join the declarations above it
+    // (eslint/no-use-before-define).
     "eslint/one-var": ["error", "consecutive"],
-    // pi optional model fields and wasm-bindgen Option inputs require undefined.
+    // pi's optional fields (e.g. a registry model lookup miss) and wasm-bindgen
+    // `Option<T>` parameters are `undefined`; with oxc/no-optional-chaining off
+    // the code compares against it directly, and unicorn/no-typeof-undefined
+    // (on) forbids the typeof form.
     "eslint/no-undefined": "off",
-    // TypeBox and pi-ai StringEnum are factories, not constructors.
+    // typebox's `Type.*` and pi-ai's `StringEnum` are factories, not classes.
     "eslint/new-cap": [
       "error",
       { "capIsNewExceptionPattern": "^Type\\.", "capIsNewExceptions": ["StringEnum"] }
     ],
-    // pi APIs and tsify-generated types are mutable declarations.
+    // pi's API types and the types wasm-bindgen generates from the Rust cores
+    // are mutable by declaration; the rule stays on for every other type.
     "typescript/prefer-readonly-parameter-types": [
       "error",
       {
@@ -60,22 +77,30 @@
             "name": [
               "AgentBeforeSettleEvent",
               "AgentToolUpdateCallback",
+              "ContextEvent",
               "ExtensionAPI",
               "ExtensionCommandContext",
               "ExtensionContext",
               "ExtensionToolContext",
+              "InputEvent",
               "SessionBoundaryDraft",
               "SessionEntry",
               "SessionMessageEntry",
               "SessionStartEvent",
               "SessionTreeEvent",
-              "ToolInfo"
+              "ToolInfo",
+              "TurnEndEvent"
             ]
           },
           {
             "from": "package",
             "package": "@earendil-works/pi-ai",
             "name": ["Model", "ToolResultMessage"]
+          },
+          {
+            "from": "package",
+            "package": "@earendil-works/pi-agent-core",
+            "name": ["AgentMessage"]
           },
           { "from": "lib", "name": "AbortSignal" },
           {
@@ -103,17 +128,14 @@
   },
   "overrides": [
     {
-      // pi requires default export and a five-parameter tool execute callback.
+      // pi loads an extension through its default export (docs/extensions.md),
+      // and a tool's `execute` has five parameters, the last being the context.
       "files": ["packages/*/src/index.ts"],
       "rules": { "import/no-default-export": "off", "eslint/max-params": "off" }
     },
     {
-      // pi invokes these callbacks with mutable message unions; context returns those same messages.
-      "files": ["packages/pi-prewalk/src/index.ts", "packages/pi-prewalk/src/projection.ts"],
-      "rules": { "typescript/prefer-readonly-parameter-types": "off" }
-    },
-    {
-      // The only file readers: synchronous WASM initialization and live config.
+      // The only modules that read files: the WASM bytes and the config. The
+      // extension factory is synchronous, so the core loads synchronously.
       "files": ["packages/*/src/wasm.ts", "packages/*/src/config.ts"],
       "rules": { "import/no-nodejs-modules": "off", "node/no-sync": "off" }
     },
@@ -121,7 +143,9 @@
       "files": ["**/*.test.ts"],
       "plugins": ["vitest"],
       "rules": {
-        // Contradicts vitest/prefer-importing-vitest-globals, which stays on.
+        // Contradicts vitest/prefer-importing-vitest-globals, which stays on:
+        // tests import `describe`, `it`, and `expect`, so they are typed
+        // without vitest's globals mode.
         "vitest/no-importing-vitest-globals": "off",
         // Contradict vitest/prefer-strict-boolean-matchers, which stays on.
         "vitest/prefer-to-be-truthy": "off",
