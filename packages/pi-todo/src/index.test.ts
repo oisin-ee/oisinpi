@@ -1,0 +1,69 @@
+import { describe, expect, it } from "vitest";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import piTodo from "./index.ts";
+
+/** The API subset the extension uses, fully typed without loading the SDK. */
+type TodoAPI = Readonly<
+  Pick<ExtensionAPI, "appendEntry" | "getAllTools" | "on" | "registerCommand" | "registerTool">
+>;
+interface Registration {
+  readonly api: TodoAPI;
+  readonly commands: readonly string[];
+  readonly events: readonly string[];
+  readonly tools: readonly { readonly name: string; readonly parameters: unknown }[];
+}
+
+/**
+ * Captures pi registration facts without loading the SDK.
+ * @returns {Registration} Typed registration methods and captured facts.
+ */
+const registration = (): Registration => {
+  const commands: string[] = [],
+    events: string[] = [],
+    tools: { name: string; parameters: unknown }[] = [];
+  return {
+    api: {
+      appendEntry: (): void => {
+        // No session writes during registration.
+      },
+      getAllTools: () => [],
+      on: (event): (() => void) => {
+        events.push(event);
+        return (): void => {
+          // No subscriptions need cleanup in this mock.
+        };
+      },
+      registerCommand: (name): void => {
+        commands.push(name);
+      },
+      registerTool: (tool: { readonly name: string; readonly parameters: unknown }): void => {
+        tools.push({ name: tool.name, parameters: tool.parameters });
+      },
+    },
+    commands,
+    events,
+    tools,
+  };
+};
+
+describe("extension registration", () => {
+  it("registers all operations and the branch lifecycle", { timeout: 5000 }, () => {
+    expect.hasAssertions();
+    const registered = registration();
+    piTodo(registered.api);
+    expect(registered.tools).toMatchObject([
+      {
+        name: "todo",
+        parameters: {
+          properties: { op: { enum: ["init", "start", "done", "drop", "append", "view"] } },
+        },
+      },
+    ]);
+    expect(registered.events).toStrictEqual([
+      "session_start",
+      "session_tree",
+      "agent_before_settle",
+    ]);
+    expect(registered.commands).toStrictEqual(["todos"]);
+  });
+});
