@@ -1,0 +1,36 @@
+{
+  "name": "@oisin-ee/pi-todo",
+  "version": "0.0.0",
+  "description": "A todo tool for pi with a Rust core: one active task, state on the session branch.",
+  "keywords": [
+    "pi-extension",
+    "pi-package",
+    "todo"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oisin-ee/pi-prewalk.git",
+    "directory": "packages/pi-todo"
+  },
+  "files": [
+    "src/",
+    "!src/**/*.test.ts"
+  ],
+  "type": "module",
+  "devDependencies": {
+    "@earendil-works/pi-ai": "catalog:",
+    "@earendil-works/pi-coding-agent": "catalog:",
+    "typebox": "catalog:"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  }
+}

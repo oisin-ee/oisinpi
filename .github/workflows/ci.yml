@@ -1,0 +1,69 @@
+name: CI
+
+# `moon ci` runs the tasks that the changed files affect. Drafts run nothing;
+# a ready pull request and every push to main run the changed range. The
+# repository is public and every dependency is on npmjs.org, so the job needs
+# no registry token and no remote cache.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name == 'push' && github.sha || '' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  checks:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # moon needs the history to find the merge base; blobs load on demand.
+          fetch-depth: 0
+          filter: blob:none
+      # rust-toolchain.toml selects the toolchain and the wasm32 target.
+      - run: rustup toolchain install
+      - uses: moonrepo/setup-toolchain@261c62cb5b0f580c7be7c8cd0f023a2e96756095 # v0.6.4
+        with:
+          cache-base: main
+      - run: proto install
+      - id: store
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-store-
+      # moon compares a pull request's base with its head, and a push with the
+      # commit before it. A manual run and the first push compare against the
+      # root commit, so every task is affected.
+      - name: Select the revisions to compare
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          base="${PR_BASE:-$PUSH_BEFORE}"
+          head="${PR_HEAD:-$(git rev-parse HEAD)}"
+          if [ -z "$base" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            base="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+          fi
+          echo "MOON_BASE=$base" >> "$GITHUB_ENV"
+          echo "MOON_HEAD=$head" >> "$GITHUB_ENV"
+          echo "moon compares $base..$head"
+      - name: Affected tasks
+        run: moon ci

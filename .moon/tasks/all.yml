@@ -1,0 +1,12 @@
+$schema: https://moonrepo.dev/schemas/tasks.json
+# All commands resolve through Proto (`.prototools`).
+implicitInputs:
+  - /.prototools
+  - /.config/proto/plugins/*.toml
+  - /rust-toolchain.toml
+  - /.moon/**/*.yml
+  - /.gitignore
+taskOptions:
+  cache: true
+  runInCI: affected
+  outputStyle: buffer-only-failure
