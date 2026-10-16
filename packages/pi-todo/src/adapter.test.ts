@@ -117,6 +117,24 @@ describe("branch replay", () => {
   });
 });
 
+describe("empty list", () => {
+  it("shows no widget while the branch has no tasks", { timeout: 5000 }, () => {
+    expect.hasAssertions();
+    const test = fixture(),
+      { calls } = vi.mocked(test.ctx.ui.setWidget).mock;
+    start(test.host, test.ctx);
+    test.mutate({ items: ["a"], op: "init" });
+    replay(test.ctx);
+    test.rewind();
+    replay(test.ctx);
+    expect(calls).toStrictEqual([
+      ["pi-todo", undefined],
+      ["pi-todo", ["Todo list: 0/1 completed", "[/] a"]],
+      ["pi-todo", undefined],
+    ]);
+  });
+});
+
 describe("collision", () => {
   it("notifies once at startup and leaves the owner alone", { timeout: 5000 }, () => {
     expect.hasAssertions();

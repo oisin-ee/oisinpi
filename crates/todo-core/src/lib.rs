@@ -144,6 +144,15 @@ pub fn view(list: &TodoList) -> String {
         .join("\n")
 }
 
+/// The widget lines for the list. An empty list has no widget.
+#[must_use]
+pub fn widget(list: &TodoList) -> Option<Vec<String>> {
+    if list.tasks.is_empty() {
+        return None;
+    }
+    Some(view(list).lines().map(str::to_owned).collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -224,6 +233,20 @@ mod tests {
             view(&list),
             "Todo list: 0/2 completed\n[/] a\n[ ] b",
             "header and marks"
+        );
+    }
+
+    #[test]
+    fn widget_hides_an_empty_list() {
+        assert_eq!(widget(&TodoList::default()), None, "no widget");
+        let list = init(items(&["a"])).unwrap();
+        assert_eq!(
+            widget(&list),
+            Some(vec![
+                "Todo list: 0/1 completed".to_owned(),
+                "[/] a".to_owned()
+            ]),
+            "one line per row"
         );
     }
 }

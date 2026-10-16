@@ -74,7 +74,7 @@ export default function prewalk(pi: ExtensionAPI): void {
     return { action: "continue" };
   });
   pi.registerCommand("prewalk", {
-    description: "Arm a handoff, or use off, restart, status.",
+    description: "Arm a handoff (no argument or on), or use off, restart, status.",
     async handler(command, ctx) {
       await adapter.run({ command: command.trim(), kind: "command" }, ctx);
     },

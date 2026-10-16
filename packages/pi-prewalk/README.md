@@ -20,7 +20,7 @@ The target needs a provider-qualified model ID and configured credentials. Alias
 
 ## Controls
 
-Use `/prewalk` to arm from the active model. Use `/prewalk off` to cancel without changing the model or config.
+Use `/prewalk` or `/prewalk on` to arm from the active model. Use `/prewalk off` to cancel without changing the model or config.
 Use `/prewalk restart` to select the saved default and arm again. Use `/prewalk status` to inspect branch state and config errors.
 
 The startup flags are `--prewalk`, `--no-prewalk`, and `--prewalk-into provider/model`.
