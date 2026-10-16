@@ -27,6 +27,7 @@
     "extensions": [
       "./node_modules/@oisin-ee/pi-todo/src/index.ts",
       "./node_modules/@oisin-ee/pi-prewalk/src/index.ts"
-    ]
+    ],
+    "image": "https://raw.githubusercontent.com/oisin-ee/pi-prewalk/main/assets/prewalk.png"
   }
 }
