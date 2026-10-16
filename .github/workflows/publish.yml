@@ -1,0 +1,56 @@
+name: Publish
+
+# Changesets drives the release. While `.changeset/` holds changesets, a push
+# to main opens or updates the "Version Packages" pull request. Merging it
+# removes them, and the next run publishes every package whose version is not
+# on npm yet, then pushes its tag and creates its GitHub release.
+#
+# `changeset publish` runs `pnpm publish` for each package (Changesets 3).
+# pnpm publishes with npm trusted publishing (OIDC, `id-token: write`) and
+# adds provenance on its own for a public repository, so the job has no npm
+# token. Each package's trusted publisher names this workflow file.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One release at a time, and never cancel a run mid-publish.
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      # The version pull request, the release tags, and the GitHub releases.
+      contents: write
+      pull-requests: write
+      # npm trusted publishing.
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # rust-toolchain.toml selects the toolchain and the wasm32 target.
+      - run: rustup toolchain install
+      - uses: moonrepo/setup-toolchain@261c62cb5b0f580c7be7c8cd0f023a2e96756095 # v0.6.4
+        with:
+          cache-base: main
+      - run: proto install
+      - run: pnpm install --frozen-lockfile
+      # The WASM bindings are gitignored and published, so build them before
+      # the packages are packed.
+      - run: moon run pi-todo:generate pi-prewalk:generate
+      - uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        with:
+          publish-script: pnpm exec changeset publish
+          commit-message: "chore: version packages"
+          pr-title: "chore: version packages"
