@@ -83,6 +83,24 @@ describe("snapshot validation", () => {
   });
 
   it.each([
+    {
+      tasks: [
+        {
+          content: "Closed",
+          status: "completed",
+          subtasks: [{ content: "Open", status: "in_progress" }],
+        },
+      ],
+    },
+    {
+      tasks: [
+        {
+          content: "Dropped",
+          status: "abandoned",
+          subtasks: [{ content: "Open", status: "pending" }],
+        },
+      ],
+    },
     { tasks: [{ content: " ", status: "pending" }] },
     {
       tasks: [
@@ -101,6 +119,6 @@ describe("snapshot validation", () => {
     },
   ])("rejects malformed state %j", { timeout: 5000 }, (snapshot: unknown) => {
     expect.hasAssertions();
-    expect(() => parse(snapshot)).toThrow(/Missing|Duplicate|Invalid/u);
+    expect(() => parse(snapshot)).toThrow(/Missing|Duplicate|Invalid|open subtasks/u);
   });
 });

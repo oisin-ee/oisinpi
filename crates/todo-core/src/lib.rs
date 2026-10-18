@@ -134,11 +134,14 @@ impl std::error::Error for TodoError {}
 /// Validates snapshot labels and sibling identity without changing recorded statuses.
 ///
 /// # Errors
-/// Rejects blank labels and duplicate siblings.
+/// Rejects blank labels, duplicate siblings, and closed parents with open children.
 pub fn validate(list: &TodoList) -> Result<(), TodoError> {
     validate_labels(list.tasks.iter().map(|task| task.content.as_str()))?;
     for task in &list.tasks {
         validate_labels(task.subtasks.iter().map(|child| child.content.as_str()))?;
+        if !task.status.is_open() && task.subtasks.iter().any(|child| child.status.is_open()) {
+            return Err(TodoError::OpenChildren(task.content.clone()));
+        }
     }
     Ok(())
 }
