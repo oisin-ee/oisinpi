@@ -1,5 +1,19 @@
 # Todo work units and subtasks
 
+## Execution evidence and release handoff
+
+Source implementation is locally committed on both main branches. Native todos track remaining acceptance, not this plan's original checklist.
+
+- Oisinpi: hierarchy `eb674408`, closed-parent invariant `4e63e13`, strict parsing integration `58abb27`, final test organization `478ef47`. Wrangle: hosted renderer `076382e`, hierarchy contract coverage `3207bb4`.
+- Final behavior proof: 79 TypeScript/WASM tests passed before test-only regrouping, then all 19 hierarchy tests passed after regrouping. Eleven core tests passed in the worker. Both affected Clippy checks, Rust formatting, TypeScript lint, and workspace formatting passed.
+- Real provider/consumer integration passed against final source in both load orders, including nested rows and explicit parent review. Real Pi regular/100-column and fullscreen/55-column runs passed after strict parsing integration. Actual tool calls created pending children, started two siblings, completed children, then completed the parent separately. Inline navigation preserved a checked editor draft. Smoke processes exited.
+- Independent static review found no Unit 1 lifecycle defects. Unit 2 review exposed missing closed-parent validation and unknown-field handling. Rust now rejects both through its own validator and strict map deserializers. Caller tests prove rejected inputs write no state.
+- Release requirement: publish a protocol-v2 Wrangle release and matching pi-todo release together, then update collection dependency pins through the normal release process. No release version is assigned here. Existing installed oisinpi 0.5.1 and Wrangle 0.12.2 belong to the separate inline-widget release and do not contain this feature. Mixed protocol versions retain standalone todos.
+
+No feature publication, installation, dependency-pin update, or managed configuration change is authorized by this handoff. Untested acceptance details remain: manual theme switching and resumed-session UI navigation for nested state. Existing branch and theme tests cover those seams but do not replace a manual walkthrough.
+
+The main worktree's stale `core.hooksPath` pointed at the old `pi-prewalk` checkout. It now points at this worktree's generated `.moon/hooks`. Final commit hooks executed successfully.
+
 ## Context
 
 The user wants todos that guide agents toward bounded delegation. One assignment must fit one agent session, without trivial fragmentation or oversized handoffs.
