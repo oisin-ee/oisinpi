@@ -44,7 +44,8 @@ const isApprovedPlan = (value: unknown): value is ApprovedPlan =>
       "Before implementation, represent the approved plan's remaining work in that list.",
       "If the list is empty, call todo with op=init and the remaining approved tasks in order.",
       "Otherwise, reuse matching tasks and append missing tasks. Preserve unrelated work and completed progress.",
-      "Select the next approved task with op=start. Update tasks with op=done or op=drop as work proceeds.",
+      "If approved work remains, select its next open task with op=start. Never restart a completed task just because the plan was approved again.",
+      "If no approved work remains, report completion without changing tasks. Otherwise, update tasks with op=done or op=drop as work proceeds.",
       "Resolve a relative planFilePath against cwd. The approved document and reviewer feedback follow as JSON:",
       JSON.stringify({
         cwd: plan.cwd,

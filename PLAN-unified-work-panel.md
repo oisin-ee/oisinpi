@@ -1,6 +1,18 @@
 # Unified work strip and panel
 
-Status: ready for plan review. Planning only; no implementation, publication, or installation has occurred.
+Status: approved and executing. Step 2 (display contract) is active; no release or installation has occurred.
+
+Execution evidence:
+
+- Approved-plan commit: `fe7bfde`; todo publisher commit: `74a563f`. Todo tests: 43 passed; scoped lint passed.
+- Wrangle consumer changes remain uncommitted. Its shim suite passed 24 tests, including the real pi-todo cross-package test in both load orders; typecheck passed. A subsequent error-path cleanup needs its final check before commit.
+- Independent caller-guidance worker commit: `9e1e5e61674ce2c134f47f8ede96040fdf64fcb8`; reviewed, not yet integrated. Worker reported 42 tests plus build/lint/format passing.
+- User authorized `LEFTHOOK=0` for the Step 2 Pi-only commit after scoped checks. Wrangle contract committed as `54af5d4`; step 2 marked complete. This approval covered that commit only.
+- Step 3 remains uncommitted and is not marked complete. Latest scoped checks: 36 tests passed (including both real provider load orders), typecheck passed. Independent review found late actions after shutdown and host-label/ID deduplication errors; both now have fixes and regression tests. Dialogs use the interaction AbortSignal, details close on abort, and history maps board labels through existing `machine list` IDs.
+- Isolated regular/fullscreen Pi walkthroughs at 100 and 55 columns opened the panel, switched tabs, inspected todo details and returned with Escape. These walkthroughs seeded real branch entries; they did not execute the todo tool. Earlier wrapper-based todo-tool smoke was invalid because source ownership correctly rejected the wrapper; it is not acceptance evidence.
+- Test-owned Wrangle jobs `r-1792339173225-73314-62` and `r-1792339180065-73314-70` ended with exits 0 and 7, and retained bounded reads worked after automatic closure. Two queued test tickets were cancelled. Running-job stop, panel-based job actions, draft restoration, branch/resume, real todo-tool execution and completion-delivery walkthrough remain unproven. No existing jobs were stopped.
+- Source inspection found `wrangle logs` drains an entire file (`src/runtime.rs:529`), so it cannot satisfy bounded interactive inspection. The panel uses existing `wrangle read <job> --host <host>` for its bounded tail (`src/watchdog.rs:307`) and shows `wrangle logs <id>` for full output. No execution-core change or new log runner.
+- The initiative memory capture failed with server HTTP 500 because its LLM provider is unavailable. The approved plan remains the task record.
 
 ## Context
 
@@ -39,7 +51,7 @@ The strip is one row, including at narrow widths: preserve the attention count, 
 
 `/work` opens All, Todos, Agents, and Jobs tabs in a bounded, keyboard-operated Pi overlay. Arrows select, Tab/Shift+Tab change views, Enter opens details, and Escape returns to the list or closes to the unchanged editor draft. Keep selection by stable row key during refresh. No new global shortcut: `/work` is always available; existing `/todos` and Alt+T open its Todos view when shared presentation is active. `/todos list` remains a plain readout. `/wrangle` retains host/profile/inbox administration.
 
-All groups attention items first, then current todos and running/waiting work. Completed history stays collapsed by default. Details show full todo text, agent output/reply through `wrangle read`, or bounded job logs through `wrangle logs`. Stop a running job or cancel a queued ticket only through an explicit action and confirmation. Agent messaging, when selected, uses `wrangle send`; do not type into agent terminals. Starting jobs remains the existing Wrangle tool/CLI, not a new panel launcher. No todo mutations, profile editing, or automatic close/prune actions in `/work`.
+All groups attention items first, then current todos and running/waiting work. Completed history stays collapsed by default. Details show full todo text, agent output/reply through `wrangle read`, or bounded job-log tails through `wrangle read`, with `wrangle logs <id>` shown for full output. Stop a running job or cancel a queued ticket only through an explicit action and confirmation. Agent messaging, when selected, uses `wrangle send`; do not type into agent terminals. Starting jobs remains the existing Wrangle tool/CLI, not a new panel launcher. No todo mutations, profile editing, or automatic close/prune actions in `/work`.
 
 ### In-process handoff
 
@@ -90,7 +102,7 @@ Use the existing two package boundaries: pi-todo publishes its validated branch 
 ## Steps
 
 - [x] Set the replacement contract and presentation scope: existing Wrangle primitives; no todo editing; shared display lives in pi-wrangle.
-- [ ] **Unit 1 — working todo/work display contract.** Implement the pi-todo publisher/handoff and its real Wrangle strip consumer together as one contract unit. Own todo presentation/adapter paths and Wrangle `pi/index.ts`, `pi/board.ts`, `pi/work*.ts`, contract tests and docs. Prove both load orders, branch changes, single display, and standalone fallback. Acceptance: `moon run pi-todo:test pi-todo:lint` in oisinpi and `npm test && npm run typecheck` in Wrangle. Generated outputs: existing gitignored todo WASM bindings only; no new generated artifacts.
+- [x] **Unit 1 — working todo/work display contract.** Implement the pi-todo publisher/handoff and its real Wrangle strip consumer together as one contract unit. Own todo presentation/adapter paths and Wrangle `pi/index.ts`, `pi/board.ts`, `pi/work*.ts`, contract tests and docs. Prove both load orders, branch changes, single display, and standalone fallback. Acceptance: `moon run pi-todo:test pi-todo:lint` in oisinpi and `npm test && npm run typecheck` in Wrangle. Generated outputs: existing gitignored todo WASM bindings only; no new generated artifacts.
 - [ ] **Unit 2 — work panel.** After the contract lands, add the bounded tabbed overlay, read-only todo details, Wrangle read/logs/send/stop/cancel actions, recent job history, and failure states. Own Wrangle `pi/work*.ts`, integration tests and README. Acceptance: `npm test && npm run typecheck`, plus the isolated interactive walkthrough below. No generated outputs or execution-core changes.
 - [ ] **Unit 3 — caller guidance.** Independently update pi-guardrails messages and tests without weakening timeout/wait rules. Own the named guardrail policy files, adjacent tests, and its changeset. Acceptance: `moon run pi-guardrails:test pi-guardrails:lint pi-guardrails:build`. Generated output: existing gitignored `packages/pi-guardrails/dist/`. Delegate this independent unit while the lead handles the display contract; do not split writers across the same contract/files. Update Wrangle's job skill alongside its owning UI release.
 - [ ] **Unit 4 — released integration and cutover.** After approved releases exist, update the oisinpi dependency pin/lockfile and collection changeset; update dotfiles collection/guardrails/Wrangle pins together. Remove the background-task declaration/configuration with the supported removal path and verify instruction cleanup. Acceptance: affected oisinpi checks, managed dotfiles dry-run, then authorized `mise bootstrap --yes` and a fresh-session smoke check. Generated outputs: normal lockfiles, package contents, and managed settings only. No copied or patched dependencies.

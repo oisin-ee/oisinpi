@@ -137,7 +137,6 @@ describe("work provider", () => {
     test.request();
     expect(test.snapshot).toHaveBeenCalledTimes(oneCall);
   });
-
 });
 
 describe("provider ownership", () => {

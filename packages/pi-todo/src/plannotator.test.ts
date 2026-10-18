@@ -120,6 +120,25 @@ describe("approved plan continuation", () => {
   });
 });
 
+describe("completed plan reapproval", () => {
+  it("does not instruct the agent to reopen completed tasks", { timeout: 5000 }, () => {
+    expect.hasAssertions();
+    const test = fixture();
+    test.handoff.start(test.ctx);
+    test.host.events.emit(channel, approved);
+    expect(test.messages.at(firstMessage)).toContain(
+      "If the list is empty, call todo with op=init",
+    );
+    expect(test.messages.at(firstMessage)).toContain(
+      "Never restart a completed task just because the plan was approved again.",
+    );
+    expect(test.messages.at(firstMessage)).toContain(
+      "If no approved work remains, report completion without changing tasks.",
+    );
+    test.handoff.stop();
+  });
+});
+
 describe("handoff lifecycle", () => {
   it("replaces subscriptions and removes them at shutdown", { timeout: 5000 }, () => {
     expect.hasAssertions();
