@@ -48,21 +48,25 @@ describe("hosted todo rendering", () => {
       component.dispose();
     },
   );
-
 });
 
 describe("hosted viewport lifecycle", () => {
   it("keeps a bounded viewport and rejects malformed updates", { timeout: 5000 }, () => {
     expect.hasAssertions();
     const viewport = 2,
-      component = new TodoView(init(["First", "Second", "Third"]), Object.assign({}, host, {
-        height: (): number => viewport,
-      })),
+      component = new TodoView(
+        init(["First", "Second", "Third"]),
+        Object.assign({}, host, {
+          height: (): number => viewport,
+        }),
+      ),
       before = component.render(width);
     component.handleInput("\u001B[B");
     expect(component.render(width)).not.toStrictEqual(before);
     expect(component.render(width).length).toBeLessThanOrEqual(viewport);
-    expect(() => { component.update({ invalid: true }); }).toThrow(/invalid|unknown|missing/u);
+    expect(() => {
+      component.update({ invalid: true });
+    }).toThrow(/invalid|unknown|missing/u);
     component.dispose();
   });
 });

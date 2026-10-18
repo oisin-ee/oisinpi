@@ -31,26 +31,25 @@ interface TodoDisplay {
 
 const emptyCount = 0,
   headerIndex = 0,
-
-/**
- * Projects the core's summary and supplies its reusable renderer.
- * @param {TodoList} list The validated current branch snapshot.
- * @returns {TodoDisplay} An in-process presentation capability.
- */
-display = (list: TodoList): TodoDisplay => {
-  const text = view(list),
-    current =
-      list.tasks.find((task) => task.status === "in_progress") ??
-      list.tasks.find((task) => task.status === "pending");
-  return {
-    createView: (host) => new TodoView(list, host),
-    current: current?.content ?? "",
-    empty: list.tasks.length === emptyCount,
-    state: list,
-    summary: text.split("\n").at(headerIndex) ?? "",
-    text,
+  /**
+   * Projects the core's summary and supplies its reusable renderer.
+   * @param {TodoList} list The validated current branch snapshot.
+   * @returns {TodoDisplay} An in-process presentation capability.
+   */
+  display = (list: TodoList): TodoDisplay => {
+    const text = view(list),
+      current =
+        list.tasks.find((task) => task.status === "in_progress") ??
+        list.tasks.find((task) => task.status === "pending");
+    return {
+      createView: (host) => new TodoView(list, host),
+      current: current?.content ?? "",
+      empty: list.tasks.length === emptyCount,
+      state: list,
+      summary: text.split("\n").at(headerIndex) ?? "",
+      text,
+    };
   };
-};
 
 export { display };
 export type { HostedView, TodoDisplay, ViewHost };
