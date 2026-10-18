@@ -1,8 +1,15 @@
 # Unified work strip and panel
 
-Status: approved and executing. Steps 3 and 4 are complete. Step 5 is active. User authorized completion, including releases and managed cutover. Wrangle 0.12.1 release is running; no installation has occurred.
+Status: all five approved steps complete. Wrangle 0.12.1 and collection 0.5.0 are published; the managed local cutover and fresh-session acceptance passed. Existing jobs and their logs were preserved.
 
 Execution evidence:
+
+- Release: Wrangle `313f021` / v0.12.1, workflow `39147642730` succeeded. The initial v0.12.0 workflow was cancelled before publication to correct the Cargo lockfile; its tag was not rewritten.
+- Collection `00f01cb` / 0.5.0: publication `39148119324` and CI `39148119389` succeeded. All fixed-group packages use 0.5.0; the collection bundles released pi-wrangle 0.12.1.
+- Dotfiles commits `c6f3eb3` and `03f221a` are pushed. Wrangle binary, Pi bundle, Claude/Codex marketplaces, guardrails, and normal lockfiles align. Unrelated live `retry.enabled=false` remains uncommitted and untouched.
+- Supported package lifecycle removed pi-background-tasks and its APPEND_SYSTEM block. The old tool reported no running tasks; persisted running records had no live processes. Logs and state were retained.
+- Managed dry-run and `mise bootstrap --yes --only dotfiles,tools,task` succeeded. Scoped parts avoid unrelated services, system configuration, and repository synchronization. No services were restarted and no fleet rollout is claimed.
+- Fresh installed Pi session verified `todo`, `/work`, and `/wrangle`; `bg_task` and `bg_status` were absent. The installed `/work` overlay opened and closed. Installed collection is 0.5.0 and Wrangle binary/package are 0.12.1. Test processes exited.
 
 - Approved-plan commit: `fe7bfde`; todo publisher commit: `74a563f`. Todo tests: 43 passed; scoped lint passed.
 - Wrangle contract committed as `54af5d4` after 24 tests and typecheck passed, including real pi-todo integration in both load orders.
@@ -110,7 +117,7 @@ Use the existing two package boundaries: pi-todo publishes its validated branch 
 - [x] **Unit 1 — working todo/work display contract.** Implement the pi-todo publisher/handoff and its real Wrangle strip consumer together as one contract unit. Own todo presentation/adapter paths and Wrangle `pi/index.ts`, `pi/board.ts`, `pi/work*.ts`, contract tests and docs. Prove both load orders, branch changes, single display, and standalone fallback. Acceptance: `moon run pi-todo:test pi-todo:lint` in oisinpi and `npm test && npm run typecheck` in Wrangle. Generated outputs: existing gitignored todo WASM bindings only; no new generated artifacts.
 - [x] **Unit 2 — work panel.** After the contract lands, add the bounded tabbed overlay, read-only todo details, Wrangle read/logs/send/stop/cancel actions, recent job history, and failure states. Own Wrangle `pi/work*.ts`, integration tests and README. Acceptance: `npm test && npm run typecheck`, plus the isolated interactive walkthrough below. No generated outputs or execution-core changes.
 - [x] **Unit 3 — caller guidance.** Independently update pi-guardrails messages and tests without weakening timeout/wait rules. Own the named guardrail policy files, adjacent tests, and its changeset. Acceptance: `moon run pi-guardrails:test pi-guardrails:lint pi-guardrails:build`. Generated output: existing gitignored `packages/pi-guardrails/dist/`. Delegate this independent unit while the lead handles the display contract; do not split writers across the same contract/files. Update Wrangle's job skill alongside its owning UI release.
-- [ ] **Unit 4 — released integration and cutover.** After approved releases exist, update the oisinpi dependency pin/lockfile and collection changeset; update dotfiles collection/guardrails/Wrangle pins together. Remove the background-task declaration/configuration with the supported removal path and verify instruction cleanup. Acceptance: affected oisinpi checks, managed dotfiles dry-run, then authorized `mise bootstrap --yes` and a fresh-session smoke check. Generated outputs: normal lockfiles, package contents, and managed settings only. No copied or patched dependencies.
+- [x] **Unit 4 — released integration and cutover.** After approved releases exist, update the oisinpi dependency pin/lockfile and collection changeset; update dotfiles collection/guardrails/Wrangle pins together. Remove the background-task declaration/configuration with the supported removal path and verify instruction cleanup. Acceptance: affected oisinpi checks, managed dotfiles dry-run, then authorized `mise bootstrap --yes` and a fresh-session smoke check. Generated outputs: normal lockfiles, package contents, and managed settings only. No copied or patched dependencies.
 
 ## Verification
 
