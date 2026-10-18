@@ -1,6 +1,6 @@
 {
   "name": "@oisin-ee/oisinpi",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Oisin's pi packages in one install: prewalk, todo, wrangle, and guardrails.",
   "keywords": [
     "guardrails",
@@ -21,7 +21,7 @@
     "@oisin-ee/pi-guardrails": "workspace:*",
     "@oisin-ee/pi-prewalk": "workspace:*",
     "@oisin-ee/pi-todo": "workspace:*",
-    "@oisin-ee/pi-wrangle": "0.11.0"
+    "@oisin-ee/pi-wrangle": "0.12.1"
   },
   "bundleDependencies": [
     "@oisin-ee/pi-guardrails",

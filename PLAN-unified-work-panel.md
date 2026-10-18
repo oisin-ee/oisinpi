@@ -1,12 +1,12 @@
 # Unified work strip and panel
 
-Status: approved and executing. Steps 3 and 4 are complete. Step 5 awaits release and installation authority; no release or installation has occurred.
+Status: approved and executing. Steps 3 and 4 are complete. Step 5 is active. User authorized completion, including releases and managed cutover. Wrangle 0.12.1 release is running; no installation has occurred.
 
 Execution evidence:
 
 - Approved-plan commit: `fe7bfde`; todo publisher commit: `74a563f`. Todo tests: 43 passed; scoped lint passed.
 - Wrangle contract committed as `54af5d4` after 24 tests and typecheck passed, including real pi-todo integration in both load orders.
-- Independent caller-guidance worker commit `9e1e5e61674ce2c134f47f8ede96040fdf64fcb8` integrated without conflict as `1f4a622`. Worker reported 42 tests plus build/lint/format passing; unchanged proof was not rerun. Wrangle's skill update is committed as `8920ea4`; step 4 marked complete. User subsequently approved all remaining commits, including the requested LEFTHOOK=0 mechanism. Release and installation authority remain separate from commit authority.
+- Independent caller-guidance worker commit `9e1e5e61674ce2c134f47f8ede96040fdf64fcb8` integrated without conflict as `1f4a622`. Worker reported 42 tests plus build/lint/format passing; unchanged proof was not rerun. Wrangle's skill update is committed as `8920ea4`; step 4 marked complete. User subsequently approved all remaining commits, including the requested LEFTHOOK=0 mechanism. The user's subsequent instruction authorizes the releases and managed cutover needed to finish; do not ask again. Preserve existing jobs and use supported lifecycle operations.
 - User authorized `LEFTHOOK=0` for the Step 2 Pi-only commit after scoped checks. Wrangle contract committed as `54af5d4`; step 2 marked complete. This approval covered that commit only.
 - Step 3 committed as `f3b71e1` and marked complete. Latest scoped checks: 36 tests passed (including both real provider load orders), typecheck passed. Independent review found late actions after shutdown and host-label/ID deduplication errors; both now have fixes and regression tests. Dialogs use the interaction AbortSignal, details close on abort, and history maps board labels through existing `machine list` IDs.
 - Isolated regular/fullscreen Pi walkthroughs at 100 and 55 columns opened the panel, switched tabs, inspected todo details and returned with Escape. These walkthroughs seeded real branch entries; they did not execute the todo tool. Earlier wrapper-based todo-tool smoke was invalid because source ownership correctly rejected the wrapper; it is not acceptance evidence.

@@ -84,8 +84,8 @@ importers:
         specifier: workspace:*
         version: link:../pi-todo
       '@oisin-ee/pi-wrangle':
-        specifier: 0.11.0
-        version: 0.11.0(@earendil-works/pi-coding-agent@1.3.0(@aws-sdk/credential-provider-node@3.972.86)(@smithy/signature-v4@5.7.4)(ws@8.22.0))(@earendil-works/pi-tui@1.3.0)
+        specifier: 0.12.1
+        version: 0.12.1(@earendil-works/pi-coding-agent@1.3.0(@aws-sdk/credential-provider-node@3.972.86)(@smithy/signature-v4@5.7.4)(ws@8.22.0))(@earendil-works/pi-tui@1.3.0)
 
   packages/pi-guardrails:
     devDependencies:
@@ -356,8 +356,8 @@ packages:
     resolution: {integrity: sha512-6QEf6yqFbETdwGITKq57aYoPfX/3K8XFNwsAlx0C1M7o8cb79sv1M3w+tWuWvIcSbNqrLF7OD7YpZMVVz335hQ==}
     engines: {node: '>=20.0.0'}
 
-  '@oisin-ee/pi-wrangle@0.11.0':
-    resolution: {integrity: sha512-Y3ikRiLG66ws6B4h9wDQoLkzkE5facsfdZj/LpKwmBW782VzMvDtLoHhS4l8WS5rlgdlUh7U/PnOY+tiKgpABQ==}
+  '@oisin-ee/pi-wrangle@0.12.1':
+    resolution: {integrity: sha512-XZu1jlKrsKQFV9af/pJ7ggZ6Eo7Hy8r2Mpb0L6SDWQJyEI1YQL/vRFNzw+L7rdyTEFfHrs7AQYXWNlK6Kb4cVA==}
     engines: {node: '>=20.6.0'}
     peerDependencies:
       '@earendil-works/pi-coding-agent': '*'
@@ -2014,7 +2014,7 @@ snapshots:
       tinyglobby: 0.2.17
       yaml: 2.9.0
 
-  '@oisin-ee/pi-wrangle@0.11.0(@earendil-works/pi-coding-agent@1.3.0(@aws-sdk/credential-provider-node@3.972.86)(@smithy/signature-v4@5.7.4)(ws@8.22.0))(@earendil-works/pi-tui@1.3.0)':
+  '@oisin-ee/pi-wrangle@0.12.1(@earendil-works/pi-coding-agent@1.3.0(@aws-sdk/credential-provider-node@3.972.86)(@smithy/signature-v4@5.7.4)(ws@8.22.0))(@earendil-works/pi-tui@1.3.0)':
     dependencies:
       '@earendil-works/pi-coding-agent': 1.3.0(@aws-sdk/credential-provider-node@3.972.86)(@smithy/signature-v4@5.7.4)(ws@8.22.0)
       '@earendil-works/pi-tui': 1.3.0

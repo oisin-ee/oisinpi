@@ -1,5 +1,11 @@
 # @oisin-ee/pi-guardrails
 
+## 0.5.0
+
+### Patch Changes
+
+- Direct blocked long Pi jobs to Wrangle run, read, and stop instead of the removed background-task tools. Preserve timeout limits, wait blocking, and guidance for other harnesses.
+
 ## 0.4.0
 
 No changes in this release.

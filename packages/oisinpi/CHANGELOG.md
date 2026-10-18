@@ -1,5 +1,18 @@
 # @oisin-ee/oisinpi
 
+## 0.5.0
+
+### Minor Changes
+
+- Bundle the released shared work strip and panel. Use Wrangle for background jobs and keep todo state on its Pi branch. Include updated guardrails that direct long work to Wrangle without relaxing timeout or wait checks.
+
+### Patch Changes
+
+- Updated dependencies [`1f4a622`]:
+  - @oisin-ee/pi-guardrails@0.5.0
+  - @oisin-ee/pi-prewalk@0.5.0
+  - @oisin-ee/pi-todo@0.5.0
+
 ## 0.4.0
 
 ### Patch Changes
