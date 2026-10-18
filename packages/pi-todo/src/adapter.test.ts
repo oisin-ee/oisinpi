@@ -8,7 +8,7 @@ import type { TodoParams } from "./tool.ts";
 import { runTodo } from "./tool.ts";
 import { widget } from "./wasm.ts";
 
-vi.mock("./wasm.ts", { spy: true });
+vi.mock(import("./wasm.ts"), { spy: true });
 
 interface Fixture {
   readonly branch: readonly SessionEntry[];

@@ -1,9 +1,9 @@
 import { ownsTodo, settle, show } from "./lifecycle.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
-import { Type } from "typebox";
 import { TODO_SHORTCUT } from "./widget.ts";
 import { TodoPresentation } from "./presentation.ts";
+import { Type } from "typebox";
 import { runTodo } from "./tool.ts";
 
 type TodoAPI = Readonly<

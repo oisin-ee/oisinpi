@@ -9,7 +9,7 @@ class TodoPresentation {
    * Replays current branch tasks without changing expansion.
    * @param {TodoContext} ctx Current branch and UI.
    */
-  refresh(ctx: TodoContext): void {
+  public refresh(ctx: TodoContext): void {
     replay(ctx, this.#expanded);
   }
 
@@ -17,7 +17,7 @@ class TodoPresentation {
    * Collapses when the session starts or the selected branch changes.
    * @param {TodoContext} ctx Current branch and UI.
    */
-  reset(ctx: TodoContext): void {
+  public reset(ctx: TodoContext): void {
     this.#expanded = false;
     this.refresh(ctx);
   }
@@ -27,7 +27,7 @@ class TodoPresentation {
    * @param {TodoHost} pi Registered tool metadata.
    * @param {TodoContext} ctx Current branch and UI.
    */
-  start(pi: TodoHost, ctx: TodoContext): void {
+  public start(pi: TodoHost, ctx: TodoContext): void {
     this.#expanded = false;
     start(pi, ctx);
   }
@@ -37,7 +37,7 @@ class TodoPresentation {
    * @param {TodoHost} pi Registered tool metadata.
    * @param {TodoContext} ctx Current branch and UI.
    */
-  toggle(pi: TodoHost, ctx: TodoContext): void {
+  public toggle(pi: TodoHost, ctx: TodoContext): void {
     if (ownsTodo(pi)) {
       this.#expanded = !this.#expanded;
       this.refresh(ctx);

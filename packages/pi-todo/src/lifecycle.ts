@@ -4,10 +4,11 @@ import type {
   ExtensionUIContext,
   SessionBoundaryDraft,
   SessionEntry,
+  Theme,
 } from "@earendil-works/pi-coding-agent";
 import { REMINDER_ENTRY, reminder } from "./reminder.ts";
-import { TodoWidget } from "./widget.ts";
 import { parse, view, widget } from "./wasm.ts";
+import { TodoWidget } from "./widget.ts";
 import { isOwnSource } from "./source.ts";
 import { latestSnapshot } from "./state.ts";
 
@@ -49,7 +50,10 @@ const ownsTodo = (pi: TodoHost): boolean =>
       rows = widget(list, expanded);
     ctx.ui.setWidget(
       "pi-todo",
-      rows === undefined ? undefined : (_tui, theme) => new TodoWidget(rows, expanded, theme),
+      rows === undefined
+        ? undefined
+        : (_tui: unknown, theme: Readonly<Pick<Theme, "fg" | "bold">>): TodoWidget =>
+            new TodoWidget(rows, expanded, theme),
     );
   },
   /**

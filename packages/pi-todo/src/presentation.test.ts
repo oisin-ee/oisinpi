@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { TodoPresentation } from "./presentation.ts";
 import { replay } from "./lifecycle.ts";
 
-vi.mock("./lifecycle.ts", { spy: true });
+vi.mock(import("./lifecycle.ts"), { spy: true });
 
 /**
  * Creates UI seams for the real replay path against an empty session branch.

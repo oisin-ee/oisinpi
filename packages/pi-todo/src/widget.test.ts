@@ -1,58 +1,74 @@
+import type { TodoList, WidgetRow } from "./wasm.ts";
 import { describe, expect, it, vi } from "vitest";
 import { init, widget } from "./wasm.ts";
 import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 import { TodoWidget } from "./widget.ts";
 
-const theme = {
-  bold: (text: string): string => `\u001b[1m${text}\u001b[22m`,
-  fg: (_color: string, text: string): string => text,
-};
+const normalWidth = 80,
+  narrowWidth = 40,
+  minimumWidth = 1,
+  wideGlyphWidth = 2,
+  compactWidth = 12,
+  wideWidth = 100,
+  emptyLength = 0,
+  theme = {
+    bold: (text: string): string => `\u001B[1m${text}\u001B[22m`,
+    fg: (_color: string, text: string): string => text,
+  },
+  /**
+   * Requires a visible widget for a nonempty test list.
+   * @param {TodoList} list Test tasks.
+   * @param {boolean} expanded Whether to reveal every group.
+   * @returns {WidgetRow[]} Rust presentation rows.
+   */
+  rows = (list: TodoList, expanded: boolean): WidgetRow[] => {
+    const result = widget(list, expanded);
+    if (result === undefined) {
+      throw new Error("Expected widget rows for a nonempty list");
+    }
+    return result;
+  };
 
 describe("todo rendering", () => {
   it("renders active work and reveals grouped details only on expansion", { timeout: 5000 }, () => {
     expect.hasAssertions();
     const list = init(["Build the widget", "Check the layout"]),
-      collapsed = new TodoWidget(widget(list, false) ?? [], false, theme),
-      expanded = new TodoWidget(widget(list, true) ?? [], true, theme);
-    expect(collapsed.render(80).map((line) => stripTerminalSequences(line).trimEnd())).toStrictEqual([
-      " In progress · 1",
-      " ● Build the widget",
-      " Alt+T · upcoming / done",
-    ]);
-    expect(expanded.render(80).map(stripTerminalSequences).join("\n")).toContain("Upcoming · 1");
-    expect(expanded.render(80).map(stripTerminalSequences).join("\n")).toContain(
-      "○ Check the layout",
-    );
-    expect(expanded.render(80).map(stripTerminalSequences).join("\n")).toContain(
-      "Alt+T · collapse",
-    );
+      collapsed = new TodoWidget(rows(list, false), false, theme),
+      expanded = new TodoWidget(rows(list, true), true, theme),
+      details = expanded
+        .render(normalWidth)
+        .map((line) => stripTerminalSequences(line))
+        .join("\n");
+    expect(
+      collapsed.render(normalWidth).map((line) => stripTerminalSequences(line).trimEnd()),
+    ).toStrictEqual([" In progress · 1", " ● Build the widget", " Alt+T · upcoming / done"]);
+    expect(details).toContain("Upcoming · 1");
+    expect(details).toContain("○ Check the layout");
+    expect(details).toContain("Alt+T · collapse");
   });
 
-  it.each([1, 2, 12, 40, 100])(
+  it.each([minimumWidth, wideGlyphWidth, compactWidth, narrowWidth, wideWidth])(
     "fits wide characters and long labels into %i columns",
     { timeout: 5000 },
     (width) => {
       expect.hasAssertions();
       const content = "Review 日本語 tasks 👩‍💻 with a long label and café combining marks",
-        component = new TodoWidget(widget(init([content]), false) ?? [], false, theme),
+        component = new TodoWidget(rows(init([content]), false), false, theme),
         lines = component.render(width);
-      expect(lines.length).toBeGreaterThan(0);
+      expect(lines.length).toBeGreaterThan(emptyLength);
       expect(lines.every((line) => visibleWidth(line) <= width)).toBe(true);
     },
   );
 
   it("reapplies theme tokens after invalidation", { timeout: 5000 }, () => {
     expect.hasAssertions();
-    const fg = vi.fn(theme.fg),
-      component = new TodoWidget(widget(init(["Active"]), false) ?? [], false, {
-        bold: theme.bold,
-        fg,
-      });
-    component.render(80);
+    const fg = vi.fn<typeof theme.fg>(theme.fg),
+      component = new TodoWidget(rows(init(["Active"]), false), false, { bold: theme.bold, fg });
+    component.render(normalWidth);
     expect(fg).toHaveBeenCalledWith("accent", "● Active");
     fg.mockClear();
     component.invalidate();
-    component.render(40);
+    component.render(narrowWidth);
     expect(fg).toHaveBeenCalledWith("accent", "● Active");
     expect(fg).toHaveBeenCalledWith("dim", "Alt+T · upcoming / done");
   });
