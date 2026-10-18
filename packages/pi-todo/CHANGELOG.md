@@ -1,5 +1,11 @@
 # @oisin-ee/pi-todo
 
+## 0.3.0
+
+### Minor Changes
+
+- [`7f33497`](https://github.com/oisin-ee/oisinpi/commit/7f3349706861ab943f0be931ab3cff49e74d5f37) Thanks [@momo-momokaya[bot]](https://github.com/momo-momokaya%5Bbot%5D)! - Show only in-progress tasks in a themed, width-aware widget by default. Alt+T and /todos toggle grouped upcoming, done, and dropped tasks inline. Use /todos list for the full text summary.
+
 ## 0.2.0
 
 ### Minor Changes
