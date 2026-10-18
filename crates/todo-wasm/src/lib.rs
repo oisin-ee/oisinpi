@@ -32,6 +32,7 @@ pub fn parse(
     #[wasm_bindgen(unchecked_param_type = "unknown")] snapshot: JsValue,
 ) -> Result<Ts<TodoList>, JsError> {
     let list: TodoList = Ts::<TodoList>::new_unchecked(snapshot).to_rust()?;
+    todo_core::validate(&list)?;
     Ok(list.into_ts()?)
 }
 

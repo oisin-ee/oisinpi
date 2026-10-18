@@ -26,6 +26,7 @@ export type {
   ReminderFact,
   Request,
   Status,
+  Subtask,
   Task,
   TodoList,
   WidgetKind,

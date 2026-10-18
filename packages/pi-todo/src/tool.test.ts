@@ -3,6 +3,7 @@ import { STATE_ENTRY } from "./state.ts";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import type { TodoSession } from "./tool.ts";
 import { runTodo } from "./tool.ts";
+import { workUnitGuidance } from "./guidance.ts";
 
 interface Fake {
   readonly entries: readonly SessionEntry[];
@@ -39,22 +40,22 @@ const entry = (data: unknown): SessionEntry => ({
       },
     };
   },
-  summary = "Todo list: 0/2 completed\n[/] Read\n[ ] Fix";
+  summary = "Todo list: 0/2 completed\n[ ] Read\n[ ] Fix";
 
 describe("todo init", () => {
   it("stores the list", { timeout: 5000 }, () => {
     expect.hasAssertions();
     const { entries, session } = fake([]);
     expect(runTodo({ items: ["Read", "Fix"], op: "init" }, session).content).toStrictEqual([
-      { text: summary, type: "text" },
+      { text: `${summary}\n\n${workUnitGuidance}`, type: "text" },
     ]);
     expect(entries).toMatchObject([
       {
         customType: STATE_ENTRY,
         data: {
           tasks: [
-            { content: "Read", status: "in_progress" },
-            { content: "Fix", status: "pending" },
+            { content: "Read", status: "pending", subtasks: [] },
+            { content: "Fix", status: "pending", subtasks: [] },
           ],
         },
       },
@@ -87,19 +88,53 @@ describe("todo changes", () => {
         },
       ]),
       result = runTodo({ op, task }, session);
-    expect(result.details.tasks).toContainEqual({ content: task, status });
+    expect(result.details.tasks).toContainEqual({ content: task, status, subtasks: [] });
     expect(entries.toReversed().find((stored) => stored.type === "custom")).toMatchObject({
       data: result.details,
     });
   });
 
-  it("appends atomically and normalizes", { timeout: 5000 }, () => {
+  it("appends atomically without activation", { timeout: 5000 }, () => {
     expect.hasAssertions();
     const { entries, session } = fake([{ tasks: [{ content: "Read", status: "completed" }] }]),
       result = runTodo({ items: ["Fix"], op: "append" }, session);
-    expect(result.details.tasks).toContainEqual({ content: "Fix", status: "in_progress" });
+    expect(result.details.tasks).toContainEqual({
+      content: "Fix",
+      status: "pending",
+      subtasks: [],
+    });
     expect(() => runTodo({ items: ["New", "Fix"], op: "append" }, session)).toThrow("Duplicate");
     expect(entries).toMatchObject([{ customType: STATE_ENTRY }, { customType: STATE_ENTRY }]);
+  });
+});
+
+describe("hierarchical tool persistence", () => {
+  it("uses parent-scoped targets and never stores a rejected change", { timeout: 5000 }, () => {
+    expect.hasAssertions();
+    const { entries, session } = fake([]);
+    runTodo(
+      { items: [{ content: "Outcome", subtasks: ["Build", "Verify"] }], op: "init" },
+      session,
+    );
+    runTodo({ op: "start", parent: "Outcome", task: "Build" }, session);
+    const before = [...entries];
+    expect(() => runTodo({ op: "done", task: "Outcome" }, session)).toThrow("open subtasks");
+    expect(() =>
+      runTodo({ items: ["New", "Build"], op: "append", parent: "Outcome" }, session),
+    ).toThrow("Duplicate");
+    expect(() =>
+      runTodo(
+        { items: [{ content: "Nested", subtasks: [] }], op: "append", parent: "Outcome" },
+        session,
+      ),
+    ).toThrow("Invalid arguments");
+    expect(entries).toStrictEqual(before);
+    expect(runTodo({ op: "view" }, session).content).toStrictEqual([
+      {
+        text: "Todo list: 0/1 completed outcomes; 0/2 subtasks completed\n[/] Outcome\n  [/] Build\n  [ ] Verify",
+        type: "text",
+      },
+    ]);
   });
 });
 

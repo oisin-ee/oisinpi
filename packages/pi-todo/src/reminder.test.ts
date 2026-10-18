@@ -52,6 +52,37 @@ describe("reminder projection", () => {
   });
 });
 
+describe("hierarchical reminders", () => {
+  it("names open children and explicit parent review", { timeout: 5000 }, () => {
+    expect.hasAssertions();
+    const branch = [
+      snapshot({
+        tasks: [
+          {
+            content: "Outcome",
+            status: "in_progress",
+            subtasks: [{ content: "Build", status: "pending" }],
+          },
+        ],
+      }),
+    ];
+    expect(reminder(branch, [])).toContain("Outcome → Build");
+    branch.push(
+      snapshot({
+        tasks: [
+          {
+            content: "Outcome",
+            status: "in_progress",
+            subtasks: [{ content: "Build", status: "completed" }],
+          },
+        ],
+      }),
+    );
+    expect(reminder(branch, [])).toContain("Ready for review");
+    expect(reminder(branch, [])).toContain("Reminder 1/3");
+  });
+});
+
 describe("reminder replay", () => {
   it("replays the budget and resets on the latest user message", { timeout: 5000 }, () => {
     expect.hasAssertions();

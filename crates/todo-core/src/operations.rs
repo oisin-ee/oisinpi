@@ -1,8 +1,6 @@
 //! Atomic operations over a branch snapshot.
-
+use crate::{Status, Subtask, Task, TodoError, TodoList, validate};
 use serde::{Deserialize, Serialize};
-
-use crate::{Status, TodoError, TodoList, init, normalize};
 
 /// Supported model-facing operations.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -17,14 +15,27 @@ pub enum Operation {
     View,
 }
 
-/// One operation, with task content used as an exact identifier.
+/// Root creation accepts standalone outcomes or outcomes with leaf work units.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
+#[serde(untagged, deny_unknown_fields)]
+pub enum Item {
+    Text(String),
+    Outcome {
+        content: String,
+        subtasks: Vec<String>,
+    },
+}
+
+/// Exact task content, scoped by an optional root parent.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
 #[serde(deny_unknown_fields)]
 pub struct Request {
     pub op: Operation,
-    pub items: Option<Vec<String>>,
+    pub items: Option<Vec<Item>>,
     pub task: Option<String>,
+    pub parent: Option<String>,
 }
 
 /// A successful operation; views never persist a snapshot.
@@ -35,183 +46,357 @@ pub struct Change {
     pub persist: bool,
 }
 
-/// Applies one operation without changing the input on failure.
+pub(crate) fn create(items: Vec<Item>) -> Result<TodoList, TodoError> {
+    if items.is_empty() {
+        return Err(TodoError::MissingItems);
+    }
+    let tasks = items
+        .into_iter()
+        .map(|item| {
+            let (content, children) = match item {
+                Item::Text(content) => (content, vec![]),
+                Item::Outcome { content, subtasks } => (content, subtasks),
+            };
+            Task {
+                content: content.trim().to_owned(),
+                status: Status::Pending,
+                subtasks: children
+                    .into_iter()
+                    .map(|content| Subtask {
+                        content: content.trim().to_owned(),
+                        status: Status::Pending,
+                    })
+                    .collect(),
+            }
+        })
+        .collect();
+    let list = TodoList { tasks };
+    validate(&list)?;
+    Ok(list)
+}
+
+const fn arguments(request: &Request) -> Result<(), TodoError> {
+    let invalid = match request.op {
+        Operation::Init => request.parent.is_some() || request.task.is_some(),
+        Operation::Append => request.task.is_some(),
+        Operation::Start => request.items.is_some() || request.task.is_none(),
+        Operation::Done | Operation::Drop => {
+            request.items.is_some() || (request.parent.is_some() && request.task.is_none())
+        }
+        Operation::View => {
+            request.items.is_some() || request.task.is_some() || request.parent.is_some()
+        }
+    };
+    if invalid {
+        Err(TodoError::InvalidRequest)
+    } else {
+        Ok(())
+    }
+}
+
+fn root<'a>(list: &'a mut TodoList, content: &str) -> Result<&'a mut Task, TodoError> {
+    list.tasks
+        .iter_mut()
+        .find(|task| task.content == content)
+        .ok_or_else(|| TodoError::TaskNotFound(content.to_owned()))
+}
+
+fn append(list: &mut TodoList, request: Request) -> Result<(), TodoError> {
+    let items = request.items.unwrap_or_default();
+    if let Some(parent) = request.parent {
+        if items.iter().any(|item| !matches!(item, Item::Text(_))) {
+            return Err(TodoError::InvalidRequest);
+        }
+        let additions = create(items)?;
+        let target = root(list, &parent)?;
+        target
+            .subtasks
+            .extend(additions.tasks.into_iter().map(|task| Subtask {
+                content: task.content,
+                status: task.status,
+            }));
+        if !target.status.is_open() {
+            target.status = Status::Pending;
+        }
+    } else {
+        list.tasks.extend(create(items)?.tasks);
+    }
+    validate(list)
+}
+
+fn close(task: &mut Task, status: Status) -> Result<(), TodoError> {
+    if status == Status::Completed && task.subtasks.iter().any(|child| child.status.is_open()) {
+        return Err(TodoError::OpenChildren(task.content.clone()));
+    }
+    if status == Status::Abandoned {
+        for child in &mut task.subtasks {
+            if child.status.is_open() {
+                child.status = status;
+            }
+        }
+    }
+    task.status = status;
+    Ok(())
+}
+
+fn target(list: &mut TodoList, request: &Request, status: Status) -> Result<(), TodoError> {
+    let content = request.task.as_ref().ok_or(TodoError::MissingTask)?;
+    if let Some(parent) = &request.parent {
+        let task = root(list, parent)?;
+        let child = task
+            .subtasks
+            .iter_mut()
+            .find(|child| child.content == *content)
+            .ok_or_else(|| TodoError::TaskNotFound(content.clone()))?;
+        child.status = status;
+        if status == Status::InProgress {
+            task.status = Status::InProgress;
+        }
+    } else {
+        let task = root(list, content)?;
+        if status == Status::InProgress {
+            task.status = status;
+        } else {
+            close(task, status)?;
+        }
+    }
+    Ok(())
+}
+
+/// Applies a validated operation without changing its input on failure.
 ///
 /// # Errors
-///
-/// Rejects empty or duplicate items and unknown exact-content targets.
+/// Rejects malformed requests, duplicate siblings, unknown targets and premature parent completion.
 pub fn apply(mut list: TodoList, request: Request) -> Result<Change, TodoError> {
+    validate(&list)?;
+    arguments(&request)?;
     let persist = !matches!(request.op, Operation::View);
     match request.op {
-        Operation::Init => list = init(request.items.unwrap_or_default())?,
-        Operation::Append => {
-            let additions = init(request.items.unwrap_or_default())?;
-            for task in &additions.tasks {
-                if list
-                    .tasks
-                    .iter()
-                    .any(|existing| existing.content == task.content)
-                {
-                    return Err(TodoError::DuplicateTask(task.content.clone()));
-                }
-            }
-            list.tasks
-                .extend(additions.tasks.into_iter().map(|mut task| {
-                    task.status = Status::Pending;
-                    task
-                }));
-        }
-        Operation::Start => {
-            let target = request.task.ok_or(TodoError::MissingTask)?;
-            require_task(&list, &target)?;
-            for task in &mut list.tasks {
-                if task.content == target {
-                    task.status = Status::InProgress;
-                } else if task.status == Status::InProgress {
-                    task.status = Status::Pending;
-                }
-            }
-        }
+        Operation::Init => list = create(request.items.unwrap_or_default())?,
+        Operation::Append => append(&mut list, request)?,
+        Operation::View => {}
+        Operation::Start => target(&mut list, &request, Status::InProgress)?,
         Operation::Done | Operation::Drop => {
-            if let Some(target) = &request.task {
-                require_task(&list, target)?;
-            }
             let status = if matches!(request.op, Operation::Done) {
                 Status::Completed
             } else {
                 Status::Abandoned
             };
-            for task in &mut list.tasks {
-                if request
-                    .task
-                    .as_ref()
-                    .is_none_or(|target| task.content == *target)
-                {
-                    task.status = status;
+            if request.task.is_some() {
+                target(&mut list, &request, status)?;
+            } else {
+                for task in list.tasks.iter_mut().filter(|task| task.status.is_open()) {
+                    close(task, status)?;
                 }
             }
         }
-        Operation::View => {}
     }
-    Ok(Change {
-        list: if persist { normalize(list) } else { list },
-        persist,
-    })
-}
-
-fn require_task(list: &TodoList, target: &str) -> Result<(), TodoError> {
-    if list.tasks.iter().any(|task| task.content == target) {
-        Ok(())
-    } else {
-        Err(TodoError::TaskNotFound(target.to_owned()))
-    }
+    Ok(Change { list, persist })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn request(op: Operation, task: Option<&str>, items: &[&str]) -> Request {
+    fn request(
+        op: Operation,
+        parent: Option<&str>,
+        task: Option<&str>,
+        items: Option<Vec<Item>>,
+    ) -> Request {
         Request {
             op,
+            parent: parent.map(str::to_owned),
             task: task.map(str::to_owned),
-            items: Some(items.iter().map(|item| (*item).to_owned()).collect()),
+            items,
         }
     }
-
     fn list() -> TodoList {
-        init(vec!["a".to_owned(), "b".to_owned()]).unwrap()
+        create(vec![
+            Item::Outcome {
+                content: "Outcome".to_owned(),
+                subtasks: vec!["Build".to_owned(), "Verify".to_owned()],
+            },
+            Item::Text("Other".to_owned()),
+        ])
+        .unwrap()
+    }
+    fn run(list: TodoList, request: Request) -> TodoList {
+        apply(list, request).unwrap().list
     }
 
     #[test]
-    fn start_selects_exact_content_and_can_reopen_closed_work() {
-        let closed = apply(list(), request(Operation::Done, None, &[])).unwrap();
-        let started = apply(closed.list, request(Operation::Start, Some("b"), &[])).unwrap();
-        assert_eq!(
-            started.list.tasks[1].status,
-            Status::InProgress,
-            "reopened target"
+    fn explicit_starts_preserve_parallel_work_and_require_parent_review() {
+        let list = run(
+            list(),
+            request(Operation::Start, Some("Outcome"), Some("Build"), None),
         );
-        let changed = apply(list(), request(Operation::Start, Some("b"), &[])).unwrap();
-        assert_eq!(
-            changed.list.tasks[0].status,
-            Status::Pending,
-            "demote old active"
-        );
-        assert_eq!(
-            changed.list.tasks[1].status,
-            Status::InProgress,
-            "select target"
+        let list = run(
+            list,
+            request(Operation::Start, Some("Outcome"), Some("Verify"), None),
         );
         assert!(
-            apply(list(), request(Operation::Start, Some(" b "), &[])).is_err(),
-            "no trimming identifiers"
+            list.tasks[0]
+                .subtasks
+                .iter()
+                .all(|child| child.status == Status::InProgress),
+            "parallel starts"
         );
         assert!(
-            apply(list(), request(Operation::Start, None, &[])).is_err(),
-            "start needs target"
+            apply(
+                list.clone(),
+                request(Operation::Done, None, Some("Outcome"), None)
+            )
+            .is_err(),
+            "parent blocked"
         );
-    }
-
-    #[test]
-    fn closing_normalizes_and_untargeted_closing_affects_all() {
-        for op in [Operation::Done, Operation::Drop] {
-            let changed = apply(list(), request(op, Some("a"), &[])).unwrap();
-            assert_eq!(
-                changed.list.tasks[1].status,
-                Status::InProgress,
-                "next task active"
-            );
-            let closed = apply(changed.list, request(op, None, &[])).unwrap();
-            assert!(
-                !closed
-                    .list
-                    .tasks
-                    .iter()
-                    .any(|task| task.status == Status::InProgress),
-                "all closed"
-            );
-            assert!(
-                apply(list(), request(op, Some("unknown"), &[])).is_err(),
-                "missing target fails"
-            );
-        }
-    }
-
-    #[test]
-    fn append_is_atomic_and_preserves_active_task() {
-        let changed = apply(list(), request(Operation::Append, None, &["c", "d"])).unwrap();
-        assert_eq!(changed.list.tasks.len(), 4, "both added");
+        assert!(
+            apply(list.clone(), request(Operation::Done, None, None, None)).is_err(),
+            "bulk completion blocked"
+        );
+        let list = run(
+            list,
+            request(Operation::Done, Some("Outcome"), Some("Build"), None),
+        );
+        let list = run(
+            list,
+            request(Operation::Drop, Some("Outcome"), Some("Verify"), None),
+        );
+        assert!(
+            list.tasks[0].ready_for_review(),
+            "explicit integration review remains"
+        );
+        assert!(
+            crate::view(&list).contains("1/2 subtasks completed"),
+            "abandoned not completed"
+        );
+        let list = run(list, request(Operation::Done, None, Some("Outcome"), None));
         assert_eq!(
-            changed.list.tasks[0].status,
-            Status::InProgress,
-            "keep active"
+            list.tasks[0].status,
+            Status::Completed,
+            "explicit completion"
         );
         assert_eq!(
-            changed.list.tasks[2].status,
+            list.tasks[1].status,
             Status::Pending,
-            "append pending"
-        );
-        for items in [&["c", "a"][..], &["c", "c"], &[" "], &[]] {
-            assert!(
-                apply(list(), request(Operation::Append, None, items)).is_err(),
-                "reject invalid append"
-            );
-        }
-        let closed = apply(list(), request(Operation::Drop, None, &[])).unwrap();
-        let added = apply(closed.list, request(Operation::Append, None, &["c"])).unwrap();
-        assert_eq!(
-            added.list.tasks[2].status,
-            Status::InProgress,
-            "new first open task"
+            "no automatic activation"
         );
     }
 
     #[test]
-    fn view_is_read_only() {
-        let original = TodoList::default();
-        let change = apply(original.clone(), request(Operation::View, None, &[])).unwrap();
-        assert_eq!(change.list, original, "same snapshot");
-        assert!(!change.persist, "no state entry");
+    fn drop_preserves_completed_children_and_append_reopens_parent() {
+        let list = run(
+            list(),
+            request(Operation::Done, Some("Outcome"), Some("Build"), None),
+        );
+        let list = run(list, request(Operation::Drop, None, Some("Outcome"), None));
+        assert_eq!(
+            list.tasks[0].subtasks[0].status,
+            Status::Completed,
+            "completed preserved"
+        );
+        assert_eq!(
+            list.tasks[0].subtasks[1].status,
+            Status::Abandoned,
+            "open abandoned"
+        );
+        let list = run(
+            list,
+            request(
+                Operation::Append,
+                Some("Outcome"),
+                None,
+                Some(vec![Item::Text("Integrate".to_owned())]),
+            ),
+        );
+        assert_eq!(
+            list.tasks[0].status,
+            Status::Pending,
+            "closed parent reopens pending"
+        );
+        let list = run(
+            list,
+            request(Operation::Start, Some("Outcome"), Some("Build"), None),
+        );
+        assert_eq!(
+            list.tasks[0].status,
+            Status::InProgress,
+            "child start opens parent"
+        );
+    }
+
+    #[test]
+    fn exact_scoping_and_atomic_rejections() {
+        for value in [
+            request(
+                Operation::Append,
+                Some("Outcome"),
+                None,
+                Some(vec![
+                    Item::Text("New".to_owned()),
+                    Item::Text("Build".to_owned()),
+                ]),
+            ),
+            request(
+                Operation::Append,
+                Some("missing"),
+                None,
+                Some(vec![Item::Text("New".to_owned())]),
+            ),
+            request(
+                Operation::Append,
+                Some("Outcome"),
+                None,
+                Some(vec![Item::Outcome {
+                    content: "Nested".to_owned(),
+                    subtasks: vec![],
+                }]),
+            ),
+            request(Operation::Start, None, Some("Build"), None),
+            request(Operation::Start, Some("Outcome"), Some(" Build "), None),
+            request(Operation::Done, Some("Outcome"), None, None),
+        ] {
+            let original = list();
+            assert!(
+                apply(original.clone(), value).is_err(),
+                "reject without input mutation"
+            );
+            assert_eq!(original, list(), "unchanged snapshot");
+        }
+        let list = run(
+            list(),
+            request(
+                Operation::Append,
+                None,
+                None,
+                Some(vec![Item::Outcome {
+                    content: "Another".to_owned(),
+                    subtasks: vec!["Build".to_owned()],
+                }]),
+            ),
+        );
+        assert_eq!(
+            list.tasks.len(),
+            3,
+            "same child label in different parents accepted"
+        );
+    }
+
+    #[test]
+    fn bulk_closure_changes_open_work_only() {
+        let list = run(list(), request(Operation::Done, None, Some("Other"), None));
+        let list = run(list, request(Operation::Drop, None, None, None));
+        assert_eq!(
+            list.tasks[1].status,
+            Status::Completed,
+            "closed outcome preserved"
+        );
+        assert!(
+            list.tasks[0]
+                .subtasks
+                .iter()
+                .all(|child| child.status == Status::Abandoned),
+            "open children abandoned"
+        );
     }
 }

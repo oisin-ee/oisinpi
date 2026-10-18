@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Status, TodoList};
+use crate::TodoList;
 
 /// Default from oh-my-pi e7fe318, `packages/coding-agent/src/tools/settings.ts`,
 /// `cfgTodoRemindersMax` (`todo.remindersMax`).
@@ -56,12 +56,22 @@ pub fn completion_reminder(facts: &[ReminderFact]) -> Option<String> {
     if awaiting_progress || reminders >= REMINDERS_MAX {
         return None;
     }
-    let open: Vec<&str> = latest
+    let open: Vec<String> = latest
         .tasks
         .iter()
-        .filter_map(|task| {
-            matches!(task.status, Status::Pending | Status::InProgress)
-                .then_some(task.content.as_str())
+        .filter(|task| task.status.is_open())
+        .flat_map(|task| {
+            let review = if task.ready_for_review() {
+                " · Ready for review: complete after explicit integration review"
+            } else {
+                ""
+            };
+            std::iter::once(format!("{}{review}", task.content)).chain(
+                task.subtasks
+                    .iter()
+                    .filter(|child| child.status.is_open())
+                    .map(|child| format!("{} → {}", task.content, child.content)),
+            )
         })
         .collect();
     if open.is_empty() {
@@ -78,7 +88,7 @@ pub fn completion_reminder(facts: &[ReminderFact]) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::init;
+    use crate::{Status, init};
 
     fn snapshot(items: &[&str]) -> ReminderFact {
         ReminderFact::Snapshot(init(items.iter().map(|item| (*item).to_owned()).collect()).unwrap())
@@ -95,10 +105,12 @@ mod tests {
                 crate::Task {
                     content: "done".to_owned(),
                     status: Status::Completed,
+                    subtasks: vec![],
                 },
                 crate::Task {
                     content: "dropped".to_owned(),
                     status: Status::Abandoned,
+                    subtasks: vec![],
                 },
             ],
         };

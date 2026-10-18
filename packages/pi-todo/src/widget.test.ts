@@ -1,6 +1,6 @@
 import type { TodoList, WidgetRow } from "./wasm.ts";
+import { apply, init, widget } from "./wasm.ts";
 import { describe, expect, it, vi } from "vitest";
-import { init, widget } from "./wasm.ts";
 import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 import { TodoWidget } from "./widget.ts";
 
@@ -27,12 +27,21 @@ const normalWidth = 80,
       throw new Error("Expected widget rows for a nonempty list");
     }
     return result;
-  };
+  },
+  /**
+   * Creates explicitly active work for rendering tests.
+   * @param {string} task First task label.
+   * @param {readonly string[]} pending Other pending tasks.
+   * @returns {TodoList} Active snapshot.
+   */
+  started = (task: string, pending: readonly string[]): TodoList =>
+    apply(init([task, ...pending]), { items: undefined, op: "start", parent: undefined, task })
+      .list;
 
 describe("todo rendering", () => {
   it("renders active work and reveals grouped details only on expansion", { timeout: 5000 }, () => {
     expect.hasAssertions();
-    const list = init(["Build the widget", "Check the layout"]),
+    const list = started("Build the widget", ["Check the layout"]),
       collapsed = new TodoWidget(rows(list, false), false, theme),
       expanded = new TodoWidget(rows(list, true), true, theme),
       details = expanded
@@ -63,7 +72,10 @@ describe("todo rendering", () => {
   it("reapplies theme tokens after invalidation", { timeout: 5000 }, () => {
     expect.hasAssertions();
     const fg = vi.fn<typeof theme.fg>(theme.fg),
-      component = new TodoWidget(rows(init(["Active"]), false), false, { bold: theme.bold, fg });
+      component = new TodoWidget(rows(started("Active", []), false), false, {
+        bold: theme.bold,
+        fg,
+      });
     component.render(normalWidth);
     expect(fg).toHaveBeenCalledWith("accent", "● Active");
     fg.mockClear();

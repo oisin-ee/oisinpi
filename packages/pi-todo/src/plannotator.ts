@@ -2,6 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { TodoContext } from "./lifecycle.ts";
 import type { WorkHost } from "./work.ts";
 import { ownsTodo } from "./lifecycle.ts";
+import { workUnitGuidance } from "./guidance.ts";
 
 /** The supported Plannotator external-execution event. */
 interface ApprovedPlan {
@@ -41,10 +42,11 @@ const isApprovedPlan = (value: unknown): value is ApprovedPlan =>
       "The user approved this plan in Plannotator. Continue execution in this session.",
       "Use the todo tool as the only task tracker. Do not maintain Plannotator [DONE:n] markers.",
       "First call todo with op=view to inspect the current branch list.",
-      "Before implementation, represent the approved plan's remaining work in that list.",
+      "Before implementation, represent remaining outcomes with optional bounded subtasks in that list. Use parent plus exact task for child operations.",
+      workUnitGuidance,
       "If the list is empty, call todo with op=init and the remaining approved tasks in order.",
       "Otherwise, reuse matching tasks and append missing tasks. Preserve unrelated work and completed progress.",
-      "If approved work remains, select its next open task with op=start. Never restart a completed task just because the plan was approved again.",
+      "If approved work remains, explicitly start its open units with op=start. Independent units can stay active together. Never restart completed work because the plan was approved again.",
       "If no approved work remains, report completion without changing tasks. Otherwise, update tasks with op=done or op=drop as work proceeds.",
       "Resolve a relative planFilePath against cwd. The approved document and reviewer feedback follow as JSON:",
       JSON.stringify({

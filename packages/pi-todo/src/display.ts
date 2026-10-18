@@ -1,5 +1,5 @@
+import type { Subtask, TodoList } from "./wasm.ts";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import type { TodoList } from "./wasm.ts";
 import { TodoView } from "./embedded.ts";
 import { view } from "./wasm.ts";
 
@@ -38,12 +38,19 @@ const emptyCount = 0,
    */
   display = (list: TodoList): TodoDisplay => {
     const text = view(list),
+      active = list.tasks.flatMap((task) => [
+        ...(task.status === "in_progress" ? [task.content] : []),
+        ...(task.subtasks ?? [])
+          .filter((child: Readonly<Subtask>) => child.status === "in_progress")
+          .map((child: Readonly<Subtask>) => `${task.content} → ${child.content}`),
+      ]),
       current =
-        list.tasks.find((task) => task.status === "in_progress") ??
-        list.tasks.find((task) => task.status === "pending");
+        active.length > emptyCount
+          ? active.join("; ")
+          : (list.tasks.find((task) => task.status === "pending")?.content ?? "");
     return {
       createView: (host) => new TodoView(list, host),
-      current: current?.content ?? "",
+      current,
       empty: list.tasks.length === emptyCount,
       state: list,
       summary: text.split("\n").at(headerIndex) ?? "",

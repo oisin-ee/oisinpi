@@ -25,7 +25,7 @@ pub struct WidgetRow {
     pub text: String,
 }
 
-fn group(list: &TodoList, status: Status, rows: &mut Vec<WidgetRow>) {
+fn group(list: &TodoList, status: Status, expanded: bool, rows: &mut Vec<WidgetRow>) {
     let tasks: Vec<_> = list
         .tasks
         .iter()
@@ -44,10 +44,34 @@ fn group(list: &TodoList, status: Status, rows: &mut Vec<WidgetRow>) {
         kind: WidgetKind::Heading,
         text: format!("{label} · {}", tasks.len()),
     });
-    rows.extend(tasks.into_iter().map(|task| WidgetRow {
-        kind,
-        text: format!("{mark} {}", task.content),
-    }));
+    for task in tasks {
+        let review = if task.ready_for_review() {
+            " · Ready for review"
+        } else {
+            ""
+        };
+        rows.push(WidgetRow {
+            kind,
+            text: format!("{mark} {}{review}", task.content),
+        });
+        rows.extend(
+            task.subtasks
+                .iter()
+                .filter(|child| expanded || child.status == Status::InProgress)
+                .map(|child| {
+                    let (mark, kind) = match child.status {
+                        Status::Pending => ("○", WidgetKind::Upcoming),
+                        Status::InProgress => ("●", WidgetKind::Active),
+                        Status::Completed => ("✓", WidgetKind::Done),
+                        Status::Abandoned => ("−", WidgetKind::Dropped),
+                    };
+                    WidgetRow {
+                        kind,
+                        text: format!("  {mark} {}", child.content),
+                    }
+                }),
+        );
+    }
 }
 
 /// Active tasks by default; all status groups when expanded. Empty lists stay hidden.
@@ -57,7 +81,7 @@ pub fn widget(list: &TodoList, expanded: bool) -> Option<Vec<WidgetRow>> {
         return None;
     }
     let mut rows = Vec::new();
-    group(list, Status::InProgress, &mut rows);
+    group(list, Status::InProgress, expanded, &mut rows);
     if rows.is_empty() {
         rows.push(WidgetRow {
             kind: WidgetKind::Summary,
@@ -66,7 +90,7 @@ pub fn widget(list: &TodoList, expanded: bool) -> Option<Vec<WidgetRow>> {
     }
     if expanded {
         for status in [Status::Pending, Status::Completed, Status::Abandoned] {
-            group(list, status, &mut rows);
+            group(list, status, expanded, &mut rows);
         }
     }
     Some(rows)
@@ -90,6 +114,7 @@ mod tests {
             .map(|(content, status)| Task {
                 content: content.to_owned(),
                 status,
+                subtasks: vec![],
             })
             .collect(),
         }
@@ -146,6 +171,7 @@ mod tests {
             tasks: vec![Task {
                 content: "Finished".to_owned(),
                 status: Status::Completed,
+                subtasks: vec![],
             }],
         };
         assert_eq!(

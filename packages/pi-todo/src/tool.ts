@@ -2,11 +2,16 @@ import { STATE_ENTRY, latestSnapshot } from "./state.ts";
 import { apply, parse, view } from "./wasm.ts";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import type { TodoList } from "./wasm.ts";
+import { workUnitGuidance } from "./guidance.ts";
 
 /** One `todo` call, as the schema in `index.ts` admits it. */
 interface TodoParams {
   readonly op: "init" | "start" | "done" | "drop" | "append" | "view";
-  readonly items?: readonly string[];
+  readonly items?: readonly (
+    | string
+    | { readonly content: string; readonly subtasks: readonly string[] }
+  )[];
+  readonly parent?: string;
   readonly task?: string;
 }
 
@@ -25,10 +30,13 @@ interface TodoResult {
 /**
  * The result for `list`.
  * @param {TodoList} list A valid list.
+ * @param {boolean} creation Whether the call created work.
  * @returns {TodoResult} The summary and the list.
  */
-const result = (list: TodoList): TodoResult => ({
-    content: [{ text: view(list), type: "text" }],
+const result = (list: TodoList, creation: boolean): TodoResult => ({
+    content: [
+      { text: creation ? `${view(list)}\n\n${workUnitGuidance}` : view(list), type: "text" },
+    ],
     details: list,
   }),
   /**
@@ -41,14 +49,17 @@ const result = (list: TodoList): TodoResult => ({
   runTodo = (params: TodoParams, session: TodoSession): TodoResult => {
     const current = parse(latestSnapshot(session.branch())),
       { list, persist } = apply(current, {
-        items: params.items ? [...params.items] : params.items,
+        items: params.items?.map((item) =>
+          typeof item === "string" ? item : { content: item.content, subtasks: [...item.subtasks] },
+        ),
         op: params.op,
+        parent: params.parent,
         task: params.task,
       });
     if (persist) {
       session.append(STATE_ENTRY, list);
     }
-    return result(list);
+    return result(list, params.op === "init" || params.op === "append");
   };
 
 export { runTodo };

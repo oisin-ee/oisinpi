@@ -1,6 +1,6 @@
 # @oisin-ee/pi-todo
 
-A `todo` tool for [pi](https://pi.dev). The model keeps one ordered task list for the session. Exactly one task is active.
+A `todo` tool for [pi](https://pi.dev). The model keeps one ordered list of outcomes and bounded subtasks for the session. Multiple units can be active together.
 The list rules run in Rust, compiled to WebAssembly.
 
 ```bash
@@ -13,22 +13,60 @@ To install it with the other packages, use [`@oisin-ee/oisinpi`](https://www.npm
 
 The model calls `todo` with one `op`. Tasks are addressed by their exact content.
 
-| `op`     | Effect                                                       |
-| -------- | ------------------------------------------------------------ |
-| `init`   | Replaces the list with `items`.                              |
-| `append` | Adds `items` to the end.                                     |
-| `start`  | Makes `task` the active task.                                |
-| `done`   | Completes `task`. Without `task`, completes every open task. |
-| `drop`   | Abandons `task`. Without `task`, abandons every open task.   |
-| `view`   | Returns the list. It does not change it.                     |
+| `op`     | Effect                                                          |
+| -------- | --------------------------------------------------------------- |
+| `init`   | Replaces the list with `items`.                                 |
+| `append` | Adds `items` to the end.                                        |
+| `start`  | Explicitly activates `task` without demoting other active work. |
+| `done`   | Completes `task`. Without `task`, completes every open task.    |
+| `drop`   | Abandons `task`. Without `task`, abandons every open task.      |
+| `view`   | Returns the list. It does not change it.                        |
 
-When the active task closes, the next open task starts. An empty task, a repeated task, or an unknown task is an error,
-and the list stays as it was.
+Creation and append leave tasks pending. Nothing starts automatically. This replaces the previous single-active, automatic-start behavior.
+Use `start` to activate or reopen work explicitly. Starting a child also opens its parent. Starting a parent does not start its children.
+
+`items` accepts strings or outcomes with string subtasks:
+
+```json
+{
+  "op": "init",
+  "items": [
+    {
+      "content": "Password reset",
+      "subtasks": ["Implement tokens and behavior tests", "Implement form and interaction tests"]
+    },
+    "Update documentation"
+  ]
+}
+```
+
+To target a child, supply its exact `task` content and its exact root `parent` content:
+
+```json
+{ "op": "start", "parent": "Password reset", "task": "Implement tokens and behavior tests" }
+```
+
+To add children, use `append` with `parent` and string `items`. Only two levels are permitted.
+Root names are unique. Child names are unique within their parent. Different parents can use the same child name.
+Blank names, duplicate siblings, unknown targets, grandchildren, and malformed requests fail without saving a change.
+
+Each executable unit fits one agent session, with one deliverable, clear scope, and an acceptance condition.
+Split independent outcomes or work that needs another session. Combine trivial steps with their deliverable and tests.
+Delegate independent units separately. The lead can execute one unit. Keep dependent units ordered.
+Do not delegate an oversized parent as one assignment.
+
+A parent stays open after its children close and shows **Ready for review**.
+Complete the parent explicitly after integration review. Completing a parent with open children fails, including bulk completion.
+Dropping a parent abandons open children but preserves completed and abandoned children.
+Untargeted `done` and `drop` affect open work only. A parent without `task` is not a bulk-child selector.
+Appending children to a closed parent reopens it as pending. An active parent stays active.
+Outcome and subtask progress remain separate. Abandoned work never counts as completed.
 
 ## State
 
 Each task change is saved as a `todo-state` entry on the session branch. A resumed session, a `/tree` move,
 and calls made from inside codemode all see the list of the current branch.
+Old flat snapshots retain their recorded statuses and read with empty subtasks.
 
 ## Widget
 
@@ -77,7 +115,8 @@ Malformed events, a different working directory, or another owner of the `todo` 
 
 ## Reminder
 
-When the agent stops with open tasks, pi-todo adds a hidden reminder that lists them and continues the turn.
+When the agent stops with open tasks, pi-todo adds a hidden reminder and continues the turn.
+The reminder names open children and parents that await integration review.
 It sends at most 3 reminders per user message. After a reminder, it waits for the list to change before it sends
 another. A new user message resets the count.
 
@@ -87,7 +126,7 @@ If another package already registers `todo`, pi-todo stays inactive and shows a 
 
 ## Source
 
-The operations, the active-task rule, and the reminder follow
+The original flat operations and the reminder derive from
 [oh-my-pi](https://github.com/can1357/oh-my-pi/tree/e7fe318/packages/coding-agent/src) (`tools/todo`,
 `todo-tracker.ts`), MIT. Saving a custom entry on every change follows
 [rpiv-todo](https://github.com/juicesharp/rpiv-mono/tree/main/packages/rpiv-todo).

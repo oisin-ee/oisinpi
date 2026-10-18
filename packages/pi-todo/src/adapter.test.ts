@@ -94,8 +94,8 @@ describe("branch replay", () => {
     expect(widget).toHaveBeenLastCalledWith(
       {
         tasks: [
-          { content: "a", status: "in_progress" },
-          { content: "b", status: "pending" },
+          { content: "a", status: "pending", subtasks: [] },
+          { content: "b", status: "pending", subtasks: [] },
         ],
       },
       false,
@@ -106,8 +106,8 @@ describe("branch replay", () => {
     expect(widget).toHaveBeenLastCalledWith(
       {
         tasks: [
-          { content: "a", status: "completed" },
-          { content: "b", status: "completed" },
+          { content: "a", status: "completed", subtasks: [] },
+          { content: "b", status: "completed", subtasks: [] },
         ],
       },
       false,
@@ -124,11 +124,11 @@ describe("branch replay", () => {
     replay(test.ctx);
     show(test.ctx);
     expect(widget).toHaveBeenLastCalledWith(
-      { tasks: [{ content: "a", status: "in_progress" }] },
+      { tasks: [{ content: "a", status: "pending", subtasks: [] }] },
       false,
     );
     expect(test.ctx.ui.setWidget).toHaveBeenLastCalledWith("pi-todo", expect.any(Function));
-    expect(test.ctx.ui.notify).toHaveBeenLastCalledWith("Todo list: 0/1 completed\n[/] a", "info");
+    expect(test.ctx.ui.notify).toHaveBeenLastCalledWith("Todo list: 0/1 completed\n[ ] a", "info");
   });
 });
 
@@ -276,7 +276,7 @@ describe("nested-only todo", () => {
       expect(JSON.stringify(settle(test.host, test.event, test.ctx))).toContain("nested work");
       show(test.ctx);
       expect(test.ctx.ui.notify).toHaveBeenCalledExactlyOnceWith(
-        "Todo list: 0/1 completed\n[/] nested work",
+        "Todo list: 0/1 completed\n[ ] nested work",
         "info",
       );
     },
