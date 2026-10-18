@@ -42,6 +42,16 @@ Expansion stays open through task updates. Session changes and `/tree` navigatio
 When no task is active, a short status and the shortcut hint remain visible.
 Outside the terminal UI, `/todos` prints the list instead.
 
+## Shared work display
+
+When a compatible pi-wrangle extension is active, its `WORK` strip replaces the standalone todo widget.
+Tasks remain on the current Pi session branch. Wrangle receives read-only snapshots through `pi.events`.
+`/todos` and Alt+T request the shared Todos view. `/todos list` still prints the full list.
+When shared presentation ends, the standalone widget returns without changing task state.
+
+The [version 1 display contract](https://github.com/oisin-ee/wrangle/blob/main/docs/pi-work.md)
+defines the snapshot request, acknowledgement, release, and read-only view events.
+
 ## Reminder
 
 When the agent stops with open tasks, pi-todo adds a hidden reminder that lists them and continues the turn.

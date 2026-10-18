@@ -1,17 +1,19 @@
-import { ownsTodo, settle, show } from "./lifecycle.ts";
+import { ownsTodo, settle } from "./lifecycle.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
-import { TODO_SHORTCUT } from "./widget.ts";
 import { TodoPresentation } from "./presentation.ts";
+import { TodoWork } from "./work.ts";
 import { Type } from "typebox";
+import type { WorkHost } from "./work.ts";
 import { runTodo } from "./tool.ts";
 
-type TodoAPI = Readonly<
-  Pick<
-    ExtensionAPI,
-    "appendEntry" | "getAllTools" | "on" | "registerCommand" | "registerShortcut" | "registerTool"
-  >
->;
+type TodoAPI = WorkHost &
+  Readonly<
+    Pick<
+      ExtensionAPI,
+      "appendEntry" | "getAllTools" | "on" | "registerCommand" | "registerShortcut" | "registerTool"
+    >
+  >;
 
 const items = Type.Immutable(
     Type.Array(Type.String(), { description: "For init or append: tasks, in order." }),
@@ -32,13 +34,9 @@ const items = Type.Immutable(
  * @param {TodoAPI} pi The extension API methods used here.
  */
 export default function piTodo(pi: TodoAPI): void {
-  const presentation = new TodoPresentation();
-  pi.registerShortcut(TODO_SHORTCUT, {
-    description: "Expand or collapse upcoming and done todos.",
-    handler(ctx) {
-      presentation.toggle(pi, ctx);
-    },
-  });
+  const presentation = new TodoPresentation(),
+    work = new TodoWork(pi, presentation);
+  work.register(pi);
   pi.registerTool({
     description:
       "Keep the session todo list. Tasks are addressed by their exact content. One task is active; the next open task starts when it closes.",
@@ -49,6 +47,7 @@ export default function piTodo(pi: TodoAPI): void {
         },
         branch: () => ctx.sessionManager.getBranch(),
       });
+      work.publish(ctx);
       presentation.refresh(ctx);
       return result;
     },
@@ -59,23 +58,16 @@ export default function piTodo(pi: TodoAPI): void {
   });
   pi.on("session_start", (_event, ctx) => {
     presentation.start(pi, ctx);
+    work.start(ctx);
+  });
+  pi.on("session_shutdown", () => {
+    work.stop();
   });
   pi.on("session_tree", (_event, ctx) => {
     if (ownsTodo(pi)) {
+      work.publish(ctx);
       presentation.reset(ctx);
     }
   });
   pi.on("agent_before_settle", (event, ctx) => settle(pi, event, ctx));
-  pi.registerCommand("todos", {
-    description: "Toggle todo details; /todos list prints the full branch list.",
-    async handler(args, ctx) {
-      if (ownsTodo(pi)) {
-        if (args.trim() === "list" || ctx.mode !== "tui") {
-          show(ctx);
-        } else {
-          presentation.toggle(pi, ctx);
-        }
-      }
-    },
-  });
 }

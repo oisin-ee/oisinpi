@@ -6,7 +6,13 @@ import piTodo from "./index.ts";
 type TodoAPI = Readonly<
   Pick<
     ExtensionAPI,
-    "appendEntry" | "getAllTools" | "on" | "registerCommand" | "registerShortcut" | "registerTool"
+    | "appendEntry"
+    | "events"
+    | "getAllTools"
+    | "on"
+    | "registerCommand"
+    | "registerShortcut"
+    | "registerTool"
   >
 >;
 interface Registration {
@@ -30,6 +36,14 @@ const registration = (): Registration => {
     api: {
       appendEntry: (): void => {
         // No session writes during registration.
+      },
+      events: {
+        emit: (): void => {
+          // No messages during registration.
+        },
+        on: (): (() => void) => (): void => {
+          // No subscriptions during registration.
+        },
       },
       getAllTools: () => [],
       on: (event): (() => void) => {
@@ -70,6 +84,7 @@ describe("extension registration", () => {
     ]);
     expect(registered.events).toStrictEqual([
       "session_start",
+      "session_shutdown",
       "session_tree",
       "agent_before_settle",
     ]);
