@@ -10,3 +10,5 @@ packages/*/src/generated/
 .DS_Store
 # moon writes the Git hooks from `vcs.hooks` on every run
 /.moon/hooks/
+# Written by `pi-guardrails:build` and published in the npm tarball.
+packages/pi-guardrails/dist/

@@ -2,10 +2,12 @@
   "$schema": "https://unpkg.com/@changesets/config@4.0.1/schema.json",
   "baseBranch": "main",
   "access": "public",
-  "changelog": ["@changesets/changelog-github", { "repo": "oisin-ee/pi-prewalk" }],
+  "changelog": ["@changesets/changelog-github", { "repo": "oisin-ee/oisinpi" }],
   "commit": false,
   "ignore": [],
-  "fixed": [["@oisin-ee/pi-todo", "@oisin-ee/pi-prewalk", "@oisin-ee/pi-prewalk-kit"]],
+  "fixed": [
+    ["@oisin-ee/pi-todo", "@oisin-ee/pi-prewalk", "@oisin-ee/pi-guardrails", "@oisin-ee/oisinpi"]
+  ],
   "linked": [],
   "updateInternalDependencies": "patch"
 }
