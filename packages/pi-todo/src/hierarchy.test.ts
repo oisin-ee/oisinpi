@@ -192,26 +192,26 @@ describe("snapshot validation", () => {
       tasks: [{ content: "Old", status: "in_progress", subtasks: [] }],
     });
   });
+});
 
+describe("closed parent invariants", () => {
+  it.each(["completed", "abandoned"])(
+    "rejects a %s parent with open children",
+    { timeout: 5000 },
+    (status) => {
+      expect.hasAssertions();
+      const snapshot = {
+        tasks: [
+          { content: "Closed", status, subtasks: [{ content: "Open", status: "in_progress" }] },
+        ],
+      };
+      expect(() => parse(snapshot)).toThrow("open subtasks");
+    },
+  );
+});
+
+describe("malformed snapshots", () => {
   it.each([
-    {
-      tasks: [
-        {
-          content: "Closed",
-          status: "completed",
-          subtasks: [{ content: "Open", status: "in_progress" }],
-        },
-      ],
-    },
-    {
-      tasks: [
-        {
-          content: "Dropped",
-          status: "abandoned",
-          subtasks: [{ content: "Open", status: "pending" }],
-        },
-      ],
-    },
     { tasks: [], unexpected: true },
     { tasks: [{ content: "Root", status: "pending", unexpected: true }] },
     {
