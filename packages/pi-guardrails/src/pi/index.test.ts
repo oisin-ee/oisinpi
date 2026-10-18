@@ -232,6 +232,45 @@ test("pi blocks shell timeouts above ten minutes and names the unit", async () =
   }
 });
 
+test("pi directs blocked long jobs and waits to Wrangle run, read, and stop", async () => {
+  const pi = fakePi();
+  install(pi);
+  for (const [toolName, input] of [
+    ["bash", { command: "pnpm test", timeout: 601 }],
+    ["hypa_shell", { command: "pnpm test", timeoutMs: 600_001 }],
+    ["ctx_execute", { code: "print(1)", language: "python", timeout: 600_001 }],
+    ["ctx_execute_file", { path: "/tmp/job.log", code: "print(1)", timeout: 600_001 }],
+    ["ctx_batch_execute", { commands: [], queries: ["output"], timeout: 600_001 }],
+    ["ctx_execute", { code: "import time\ntime.sleep(1)", language: "python" }],
+    [
+      "ctx_execute_file",
+      { code: "await new Promise(r => setTimeout(r, 1))", language: "javascript" },
+    ],
+    ["bash", { command: "sleep 1" }],
+    ["ctx_execute", { code: "sleep 1", language: "shell" }],
+  ] as [string, Record<string, unknown>][]) {
+    const result = await pi.trigger("tool_call", { input, toolName }, { cwd: "/repo" });
+    assert.equal(result?.block, true, toolName);
+    assert.match(result?.reason ?? "", /Wrangle `run` \(mcp__wrangle__run\)/u);
+    assert.match(result?.reason ?? "", /`read` \(mcp__wrangle__read\)/u);
+    assert.match(result?.reason ?? "", /`stop` \(mcp__wrangle__stop\)/u);
+    assert.doesNotMatch(result?.reason ?? "", /bg_task|bg_status/u);
+  }
+});
+
+test("pi allows the existing Wrangle job tools", async () => {
+  const pi = fakePi();
+  install(pi);
+  for (const [toolName, input] of [
+    ["mcp__wrangle__run", { cmd: ["pnpm", "test"], timeout: "20m" }],
+    ["mcp__wrangle__read", { target: "job-1" }],
+    ["mcp__wrangle__stop", { id: "job-1" }],
+  ] as [string, Record<string, unknown>][]) {
+    const result = await pi.trigger("tool_call", { input, toolName }, { cwd: "/repo" });
+    assert.equal(result, undefined, toolName);
+  }
+});
+
 test("pi blocks blocking CI watches and points to ci_watch", async () => {
   const pi = fakePi();
   install(pi);

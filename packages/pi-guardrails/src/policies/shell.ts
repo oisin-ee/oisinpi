@@ -229,7 +229,9 @@ export const IMPERATIVE_MSG = {
 export const WAIT_MSG =
   "wait-gate: blocked a command that waits instead of working (sleep, watch, a follow flag, a --watch or --wait " +
   "flag, or a wait subcommand). Never hold a tool call to wait, and never re-read a log to check progress. " +
-  "Start long work so the host reports its exit: in pi, the `bg_task` tool; in Claude Code, `run_in_background` " +
+  "For long work in pi, use Wrangle `run` (mcp__wrangle__run) and continue other work. " +
+  "Use `read` (mcp__wrangle__read) for output and `stop` (mcp__wrangle__stop) to cancel the job. " +
+  "Start long work so the host reports its exit: in Claude Code, `run_in_background` " +
   "or Monitor (the exit arrives as a message); in Codex, exec_command, then empty write_stdin calls, which " +
   "return when the process exits. " +
   "For CI, use ci_find and ci_watch.";
