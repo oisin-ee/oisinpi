@@ -7,3 +7,4 @@ wasm-bindgen = "0.2.129"
 
 [plugins.tools]
 wasm-bindgen = "file://.config/proto/plugins/wasm-bindgen.toml"
+shfmt = "file://.config/proto/plugins/shfmt.toml"
