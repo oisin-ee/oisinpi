@@ -42,11 +42,16 @@ const isApprovedPlan = (value: unknown): value is ApprovedPlan =>
       "Use the todo tool as the only task tracker. Do not maintain Plannotator [DONE:n] markers.",
       "First call todo with op=view to inspect the current branch list.",
       "Before implementation, represent the approved plan's remaining work in that list.",
-      "If the list has no open work, call todo with op=init and the approved tasks in order.",
+      "If the list is empty, call todo with op=init and the remaining approved tasks in order.",
       "Otherwise, reuse matching tasks and append missing tasks. Preserve unrelated work and completed progress.",
       "Select the next approved task with op=start. Update tasks with op=done or op=drop as work proceeds.",
       "Resolve a relative planFilePath against cwd. The approved document and reviewer feedback follow as JSON:",
-      JSON.stringify(plan),
+      JSON.stringify({
+        cwd: plan.cwd,
+        feedback: plan.feedback,
+        planContent: plan.planContent,
+        planFilePath: plan.planFilePath,
+      }),
     ].join("\n");
 
 /** Owns the approval subscription, never the todo list or execution progress. */

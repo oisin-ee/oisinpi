@@ -62,9 +62,11 @@ const channel = "plannotator:plan-approved",
                   },
                 },
               ],
-        sendMessage: vi.fn<PlanHost["sendMessage"]>((message: { readonly content: unknown }): void => {
-          messages.push(message.content);
-        }),
+        sendMessage: vi.fn<PlanHost["sendMessage"]>(
+          (message: { readonly content: unknown }): void => {
+            messages.push(message.content);
+          },
+        ),
       },
       ctx: PlanContext = {
         cwd: "/project",
@@ -94,7 +96,9 @@ describe("approved plan continuation", () => {
       );
       expect(test.messages.at(firstMessage)).toContain(JSON.stringify(approved));
       expect(test.messages.at(firstMessage)).toContain("First call todo with op=view");
-      expect(test.messages.at(firstMessage)).toContain("Preserve unrelated work and completed progress.");
+      expect(test.messages.at(firstMessage)).toContain(
+        "Preserve unrelated work and completed progress.",
+      );
       expect(test.ctx.ui.notify).not.toHaveBeenCalled();
       test.handoff.stop();
     },
