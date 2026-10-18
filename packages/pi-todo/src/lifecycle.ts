@@ -1,15 +1,18 @@
 import type {
   BoundaryResult,
+  ExtensionContext,
   ExtensionUIContext,
   SessionBoundaryDraft,
   SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 import { REMINDER_ENTRY, reminder } from "./reminder.ts";
+import { TodoWidget } from "./widget.ts";
 import { parse, view, widget } from "./wasm.ts";
 import { isOwnSource } from "./source.ts";
 import { latestSnapshot } from "./state.ts";
 
 interface TodoContext {
+  readonly mode: ExtensionContext["mode"];
   readonly sessionManager: { readonly getBranch: () => readonly SessionEntry[] };
   readonly ui: Readonly<Pick<ExtensionUIContext, "notify" | "setWidget">>;
 }
@@ -36,10 +39,18 @@ const ownsTodo = (pi: TodoHost): boolean =>
   /**
    * Renders the selected branch snapshot, and removes the widget when the list is empty.
    * @param {TodoContext} ctx Branch and UI methods.
+   * @param {boolean} expanded Whether to reveal secondary task groups.
    */
-  replay = (ctx: TodoContext): void => {
-    const list = parse(latestSnapshot(ctx.sessionManager.getBranch()));
-    ctx.ui.setWidget("pi-todo", widget(list));
+  replay = (ctx: TodoContext, expanded = false): void => {
+    if (ctx.mode !== "tui") {
+      return;
+    }
+    const list = parse(latestSnapshot(ctx.sessionManager.getBranch())),
+      rows = widget(list, expanded);
+    ctx.ui.setWidget(
+      "pi-todo",
+      rows === undefined ? undefined : (_tui, theme) => new TodoWidget(rows, expanded, theme),
+    );
   },
   /**
    * Applies the completion decision at pi's final actionable boundary.

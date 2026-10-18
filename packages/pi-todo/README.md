@@ -27,9 +27,20 @@ and the list stays as it was.
 
 ## State
 
-Each change is saved as a `todo-state` entry on the session branch. There is no other state. So a resumed session,
-a `/tree` move, and calls made from inside codemode all see the list of the current branch. A widget shows the list
-while it has tasks, and `/todos` prints it.
+Each task change is saved as a `todo-state` entry on the session branch. A resumed session, a `/tree` move,
+and calls made from inside codemode all see the list of the current branch.
+
+## Widget
+
+The widget shows only in-progress tasks by default. Active tasks use the theme accent and bold text.
+Long task names wrap to the terminal width. An empty list has no widget.
+
+Press **Alt+T** to expand Upcoming, Done, and Dropped sections beneath the active task. Press **Alt+T** again to collapse them.
+`/todos` also toggles these sections. `/todos list` prints the full list.
+
+Expansion stays open through task updates. Session changes and `/tree` navigation collapse it. Expansion does not change saved tasks.
+When no task is active, a short status and the shortcut hint remain visible.
+Outside the terminal UI, `/todos` prints the list instead.
 
 ## Reminder
 

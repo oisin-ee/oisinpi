@@ -5,7 +5,7 @@
 //! JavaScript fails as an ordinary `Result` inside the function and leaks
 //! nothing (tsify README, "Why are the `wasm_abi` attributes deprecated").
 
-use todo_core::{Change, ReminderHistory, Request, TodoList};
+use todo_core::{Change, ReminderHistory, Request, TodoList, WidgetRow};
 use tsify::{Ts, Tsify};
 use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::{JsError, wasm_bindgen};
@@ -65,12 +65,18 @@ pub fn view(list: &Ts<TodoList>) -> Result<String, JsError> {
     Ok(todo_core::view(&list.to_rust()?))
 }
 
-/// The widget lines for `list`, or `undefined` for an empty list.
+/// Human-facing rows for `list`, or `undefined` for an empty list.
 ///
 /// # Errors
 ///
 /// Throws when `list` is not a valid todo list.
 #[wasm_bindgen]
-pub fn widget(list: &Ts<TodoList>) -> Result<Option<Vec<String>>, JsError> {
-    Ok(todo_core::widget(&list.to_rust()?))
+pub fn widget(list: &Ts<TodoList>, expanded: bool) -> Result<Option<Vec<Ts<WidgetRow>>>, JsError> {
+    todo_core::widget(&list.to_rust()?, expanded)
+        .map(|rows| {
+            rows.into_iter()
+                .map(|row| row.into_ts().map_err(JsError::from))
+                .collect()
+        })
+        .transpose()
 }

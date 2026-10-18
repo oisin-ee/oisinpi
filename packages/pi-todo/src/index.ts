@@ -1,11 +1,16 @@
-import { ownsTodo, replay, settle, show, start } from "./lifecycle.ts";
+import { ownsTodo, settle, show } from "./lifecycle.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
+import { TODO_SHORTCUT } from "./widget.ts";
+import { TodoPresentation } from "./presentation.ts";
 import { runTodo } from "./tool.ts";
 
 type TodoAPI = Readonly<
-  Pick<ExtensionAPI, "appendEntry" | "getAllTools" | "on" | "registerCommand" | "registerTool">
+  Pick<
+    ExtensionAPI,
+    "appendEntry" | "getAllTools" | "on" | "registerCommand" | "registerShortcut" | "registerTool"
+  >
 >;
 
 const items = Type.Immutable(
@@ -27,6 +32,13 @@ const items = Type.Immutable(
  * @param {TodoAPI} pi The extension API methods used here.
  */
 export default function piTodo(pi: TodoAPI): void {
+  const presentation = new TodoPresentation();
+  pi.registerShortcut(TODO_SHORTCUT, {
+    description: "Expand or collapse upcoming and done todos.",
+    handler(ctx) {
+      presentation.toggle(pi, ctx);
+    },
+  });
   pi.registerTool({
     description:
       "Keep the session todo list. Tasks are addressed by their exact content. One task is active; the next open task starts when it closes.",
@@ -37,7 +49,7 @@ export default function piTodo(pi: TodoAPI): void {
         },
         branch: () => ctx.sessionManager.getBranch(),
       });
-      replay(ctx);
+      presentation.refresh(ctx);
       return result;
     },
     executionMode: "sequential",
@@ -46,18 +58,24 @@ export default function piTodo(pi: TodoAPI): void {
     parameters,
   });
   pi.on("session_start", (_event, ctx) => {
-    start(pi, ctx);
+    presentation.start(pi, ctx);
   });
   pi.on("session_tree", (_event, ctx) => {
     if (ownsTodo(pi)) {
-      replay(ctx);
+      presentation.reset(ctx);
     }
   });
   pi.on("agent_before_settle", (event, ctx) => settle(pi, event, ctx));
   pi.registerCommand("todos", {
-    description: "Show the todo list on this session branch.",
-    async handler(_args, ctx) {
-      show(ctx);
+    description: "Toggle todo details; /todos list prints the full branch list.",
+    async handler(args, ctx) {
+      if (ownsTodo(pi)) {
+        if (args.trim() === "list" || ctx.mode !== "tui") {
+          show(ctx);
+        } else {
+          presentation.toggle(pi, ctx);
+        }
+      }
     },
   });
 }

@@ -6,6 +6,9 @@ import { STATE_ENTRY } from "./state.ts";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import type { TodoParams } from "./tool.ts";
 import { runTodo } from "./tool.ts";
+import { widget } from "./wasm.ts";
+
+vi.mock("./wasm.ts", { spy: true });
 
 interface Fixture {
   readonly branch: readonly SessionEntry[];
@@ -25,6 +28,7 @@ interface Fixture {
 const fixture = (collision = false): Fixture => {
     const branch: SessionEntry[] = [],
       ctx: TodoContext = {
+        mode: "tui",
         sessionManager: { getBranch: () => branch },
         ui: { notify: vi.fn<() => void>(), setWidget: vi.fn<() => void>() },
       },
@@ -87,18 +91,28 @@ describe("branch replay", () => {
     const test = fixture();
     test.mutate({ items: ["a", "b"], op: "init" });
     start(test.host, test.ctx);
-    expect(test.ctx.ui.setWidget).toHaveBeenLastCalledWith("pi-todo", [
-      "Todo list: 0/2 completed",
-      "[/] a",
-      "[ ] b",
-    ]);
+    expect(widget).toHaveBeenLastCalledWith(
+      {
+        tasks: [
+          { content: "a", status: "in_progress" },
+          { content: "b", status: "pending" },
+        ],
+      },
+      false,
+    );
+    expect(test.ctx.ui.setWidget).toHaveBeenLastCalledWith("pi-todo", expect.any(Function));
     test.mutate({ op: "done" });
     replay(test.ctx);
-    expect(test.ctx.ui.setWidget).toHaveBeenLastCalledWith("pi-todo", [
-      "Todo list: 2/2 completed",
-      "[x] a",
-      "[x] b",
-    ]);
+    expect(widget).toHaveBeenLastCalledWith(
+      {
+        tasks: [
+          { content: "a", status: "completed" },
+          { content: "b", status: "completed" },
+        ],
+      },
+      false,
+    );
+    expect(test.ctx.ui.setWidget).toHaveBeenLastCalledWith("pi-todo", expect.any(Function));
   });
 
   it("does not use snapshots from an abandoned branch", { timeout: 5000 }, () => {
@@ -109,11 +123,22 @@ describe("branch replay", () => {
     test.rewind();
     replay(test.ctx);
     show(test.ctx);
-    expect(test.ctx.ui.setWidget).toHaveBeenLastCalledWith("pi-todo", [
-      "Todo list: 0/1 completed",
-      "[/] a",
-    ]);
+    expect(widget).toHaveBeenLastCalledWith(
+      { tasks: [{ content: "a", status: "in_progress" }] },
+      false,
+    );
+    expect(test.ctx.ui.setWidget).toHaveBeenLastCalledWith("pi-todo", expect.any(Function));
     expect(test.ctx.ui.notify).toHaveBeenLastCalledWith("Todo list: 0/1 completed\n[/] a", "info");
+  });
+});
+
+describe("non-terminal mode", () => {
+  it("does not install a custom widget outside the TUI", { timeout: 5000 }, () => {
+    expect.hasAssertions();
+    const test = fixture();
+    test.mutate({ items: ["a"], op: "init" });
+    replay(Object.assign({}, test.ctx, { mode: "rpc" as const }));
+    expect(test.ctx.ui.setWidget).not.toHaveBeenCalled();
   });
 });
 
@@ -129,7 +154,7 @@ describe("empty list", () => {
     replay(test.ctx);
     expect(calls).toStrictEqual([
       ["pi-todo", undefined],
-      ["pi-todo", ["Todo list: 0/1 completed", "[/] a"]],
+      ["pi-todo", expect.any(Function)],
       ["pi-todo", undefined],
     ]);
   });

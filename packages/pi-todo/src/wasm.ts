@@ -28,4 +28,6 @@ export type {
   Status,
   Task,
   TodoList,
+  WidgetKind,
+  WidgetRow,
 } from "./generated/todo_core.js";

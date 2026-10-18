@@ -4,12 +4,16 @@ import piTodo from "./index.ts";
 
 /** The API subset the extension uses, fully typed without loading the SDK. */
 type TodoAPI = Readonly<
-  Pick<ExtensionAPI, "appendEntry" | "getAllTools" | "on" | "registerCommand" | "registerTool">
+  Pick<
+    ExtensionAPI,
+    "appendEntry" | "getAllTools" | "on" | "registerCommand" | "registerShortcut" | "registerTool"
+  >
 >;
 interface Registration {
   readonly api: TodoAPI;
   readonly commands: readonly string[];
   readonly events: readonly string[];
+  readonly shortcuts: readonly string[];
   readonly tools: readonly { readonly name: string; readonly parameters: unknown }[];
 }
 
@@ -20,6 +24,7 @@ interface Registration {
 const registration = (): Registration => {
   const commands: string[] = [],
     events: string[] = [],
+    shortcuts: string[] = [],
     tools: { name: string; parameters: unknown }[] = [];
   return {
     api: {
@@ -36,12 +41,16 @@ const registration = (): Registration => {
       registerCommand: (name): void => {
         commands.push(name);
       },
+      registerShortcut: (key): void => {
+        shortcuts.push(key);
+      },
       registerTool: (tool: { readonly name: string; readonly parameters: unknown }): void => {
         tools.push({ name: tool.name, parameters: tool.parameters });
       },
     },
     commands,
     events,
+    shortcuts,
     tools,
   };
 };
@@ -65,5 +74,6 @@ describe("extension registration", () => {
       "agent_before_settle",
     ]);
     expect(registered.commands).toStrictEqual(["todos"]);
+    expect(registered.shortcuts).toStrictEqual(["alt+t"]);
   });
 });
