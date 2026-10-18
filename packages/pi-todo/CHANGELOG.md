@@ -1,5 +1,13 @@
 # @oisin-ee/pi-todo
 
+## 0.4.0
+
+### Minor Changes
+
+- [`0a1434e`](https://github.com/oisin-ee/oisinpi/commit/0a1434eedb156c21abd36ae611a124b06f0ad1d8) Thanks [@momo-momokaya[bot]](https://github.com/momo-momokaya%5Bbot%5D)! - Continue approved Plannotator plans with the existing todo tool when external execution is enabled. Keep one branch-backed task list instead of a separate Plannotator checklist.
+
+- [`74a563f`](https://github.com/oisin-ee/oisinpi/commit/74a563f9fa806902d9c0cf7d1d2e01edea255dec) Thanks [@momo-momokaya[bot]](https://github.com/momo-momokaya%5Bbot%5D)! - Publish validated todo snapshots for Wrangle's shared work display. Keep task state on the Pi session branch and restore the standalone widget when shared presentation ends.
+
 ## 0.3.0
 
 ### Minor Changes

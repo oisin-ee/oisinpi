@@ -1,6 +1,6 @@
 {
   "name": "@oisin-ee/pi-todo",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A todo tool for pi with a Rust core: one active task, state on the session branch.",
   "keywords": [
     "pi-extension",
