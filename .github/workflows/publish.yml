@@ -46,9 +46,9 @@ jobs:
           cache-base: main
       - run: proto install
       - run: pnpm install --frozen-lockfile
-      # The WASM bindings are gitignored and published, so build them before
-      # the packages are packed.
-      - run: moon run pi-todo:generate pi-prewalk:generate
+      # The WASM bindings and the guardrails hook command are gitignored and
+      # published, so build them before the packages are packed.
+      - run: moon run pi-todo:generate pi-prewalk:generate pi-guardrails:build
       - uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
           publish-script: pnpm exec changeset publish

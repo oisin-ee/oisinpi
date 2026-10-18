@@ -72,6 +72,27 @@ importers:
         specifier: 'catalog:'
         version: 5.0.5(@types/node@26.6.5)(vite@8.3.4(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.0))
 
+  packages/oisinpi:
+    dependencies:
+      '@oisin-ee/pi-guardrails':
+        specifier: workspace:*
+        version: link:../pi-guardrails
+      '@oisin-ee/pi-prewalk':
+        specifier: workspace:*
+        version: link:../pi-prewalk
+      '@oisin-ee/pi-todo':
+        specifier: workspace:*
+        version: link:../pi-todo
+      '@oisin-ee/pi-wrangle':
+        specifier: 0.11.0
+        version: 0.11.0(@earendil-works/pi-coding-agent@1.3.0(@aws-sdk/credential-provider-node@3.972.86)(@smithy/signature-v4@5.7.4)(ws@8.22.0))(@earendil-works/pi-tui@1.3.0)
+
+  packages/pi-guardrails:
+    devDependencies:
+      '@earendil-works/pi-coding-agent':
+        specifier: 'catalog:'
+        version: 1.3.0(@aws-sdk/credential-provider-node@3.972.86)(@smithy/signature-v4@5.7.4)(ws@8.22.0)
+
   packages/pi-prewalk:
     devDependencies:
       '@earendil-works/pi-ai':
@@ -86,15 +107,6 @@ importers:
       typebox:
         specifier: 'catalog:'
         version: 1.3.27
-
-  packages/pi-prewalk-kit:
-    dependencies:
-      '@oisin-ee/pi-prewalk':
-        specifier: workspace:*
-        version: link:../pi-prewalk
-      '@oisin-ee/pi-todo':
-        specifier: workspace:*
-        version: link:../pi-todo
 
   packages/pi-todo:
     devDependencies:
@@ -340,6 +352,13 @@ packages:
   '@manypkg/tools@2.1.2':
     resolution: {integrity: sha512-6QEf6yqFbETdwGITKq57aYoPfX/3K8XFNwsAlx0C1M7o8cb79sv1M3w+tWuWvIcSbNqrLF7OD7YpZMVVz335hQ==}
     engines: {node: '>=20.0.0'}
+
+  '@oisin-ee/pi-wrangle@0.11.0':
+    resolution: {integrity: sha512-Y3ikRiLG66ws6B4h9wDQoLkzkE5facsfdZj/LpKwmBW782VzMvDtLoHhS4l8WS5rlgdlUh7U/PnOY+tiKgpABQ==}
+    engines: {node: '>=20.6.0'}
+    peerDependencies:
+      '@earendil-works/pi-coding-agent': '*'
+      '@earendil-works/pi-tui': '*'
 
   '@oxc-project/types@0.154.0':
     resolution: {integrity: sha512-KYOUGQFlLWR+s4QMV2Q9ko38TZm7EdO87Qm7rvZLqk/webse/cDjtyxKhg/47l0byCbs/k46LT8qc4PKjAikzA==}
@@ -1991,6 +2010,11 @@ snapshots:
       jju: 1.4.0
       tinyglobby: 0.2.17
       yaml: 2.9.0
+
+  '@oisin-ee/pi-wrangle@0.11.0(@earendil-works/pi-coding-agent@1.3.0(@aws-sdk/credential-provider-node@3.972.86)(@smithy/signature-v4@5.7.4)(ws@8.22.0))(@earendil-works/pi-tui@1.3.0)':
+    dependencies:
+      '@earendil-works/pi-coding-agent': 1.3.0(@aws-sdk/credential-provider-node@3.972.86)(@smithy/signature-v4@5.7.4)(ws@8.22.0)
+      '@earendil-works/pi-tui': 1.3.0
 
   '@oxc-project/types@0.154.0': {}
 

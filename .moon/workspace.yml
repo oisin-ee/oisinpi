@@ -10,6 +10,7 @@ projects:
   prewalk-core: crates/prewalk-core
   prewalk-wasm: crates/prewalk-wasm
   pi-prewalk: packages/pi-prewalk
+  pi-guardrails: packages/pi-guardrails
 vcs:
   defaultBranch: main
   # Moon writes `.moon/hooks` and points `core.hooksPath` at it on every

@@ -10,7 +10,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/oisin-ee/pi-prewalk.git",
+    "url": "git+https://github.com/oisin-ee/oisinpi.git",
     "directory": "packages/pi-todo"
   },
   "files": [
@@ -32,6 +32,6 @@
     "extensions": [
       "./src/index.ts"
     ],
-    "image": "https://raw.githubusercontent.com/oisin-ee/pi-prewalk/main/assets/prewalk.png"
+    "image": "https://raw.githubusercontent.com/oisin-ee/oisinpi/main/assets/prewalk.png"
   }
 }

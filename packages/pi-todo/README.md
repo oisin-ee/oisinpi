@@ -7,7 +7,7 @@ The list rules run in Rust, compiled to WebAssembly.
 pi install npm:@oisin-ee/pi-todo
 ```
 
-To install it together with prewalk, use [`@oisin-ee/pi-prewalk-kit`](https://www.npmjs.com/package/@oisin-ee/pi-prewalk-kit).
+To install it with the other packages, use [`@oisin-ee/oisinpi`](https://www.npmjs.com/package/@oisin-ee/oisinpi).
 
 ## The tool
 
