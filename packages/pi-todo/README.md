@@ -52,6 +52,26 @@ When shared presentation ends, the standalone widget returns without changing ta
 The [version 1 display contract](https://github.com/oisin-ee/wrangle/blob/main/docs/pi-work.md)
 defines the snapshot request, acknowledgement, release, and read-only view events.
 
+## Plannotator plans
+
+With Plannotator external execution, pi-todo continues approved plans in the same session.
+Add this setting to `~/.pi/agent/plannotator.json`:
+
+```json
+{
+  "executionMode": "external"
+}
+```
+
+After approval, the agent reads the current todo list and adds the remaining approved work before implementation.
+It preserves unrelated tasks and completed progress. Free-form plans do not need a special checklist format.
+The todo tool owns progress, persistence, reminders, and the shared work display.
+Plannotator returns to idle and does not maintain a second checklist or require `[DONE:n]` markers.
+
+This integration uses the supported `plannotator:plan-approved` event, verified with Plannotator `0.28.19`.
+It does not import Plannotator internals or change its code.
+Malformed events, a different working directory, or another owner of the `todo` tool stop the handoff with an error.
+
 ## Reminder
 
 When the agent stops with open tasks, pi-todo adds a hidden reminder that lists them and continues the turn.

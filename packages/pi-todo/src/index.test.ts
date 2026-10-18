@@ -13,6 +13,7 @@ type TodoAPI = Readonly<
     | "registerCommand"
     | "registerShortcut"
     | "registerTool"
+    | "sendMessage"
   >
 >;
 interface Registration {
@@ -60,6 +61,9 @@ const registration = (): Registration => {
       },
       registerTool: (tool: { readonly name: string; readonly parameters: unknown }): void => {
         tools.push({ name: tool.name, parameters: tool.parameters });
+      },
+      sendMessage: (): void => {
+        // No continuation during registration.
       },
     },
     commands,

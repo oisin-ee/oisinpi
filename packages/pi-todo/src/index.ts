@@ -1,5 +1,6 @@
 import { ownsTodo, settle } from "./lifecycle.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { PlannotatorHandoff } from "./plannotator.ts";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { TodoPresentation } from "./presentation.ts";
 import { TodoWork } from "./work.ts";
@@ -11,7 +12,13 @@ type TodoAPI = WorkHost &
   Readonly<
     Pick<
       ExtensionAPI,
-      "appendEntry" | "getAllTools" | "on" | "registerCommand" | "registerShortcut" | "registerTool"
+      | "appendEntry"
+      | "getAllTools"
+      | "on"
+      | "registerCommand"
+      | "registerShortcut"
+      | "registerTool"
+      | "sendMessage"
     >
   >;
 
@@ -34,7 +41,8 @@ const items = Type.Immutable(
  * @param {TodoAPI} pi The extension API methods used here.
  */
 export default function piTodo(pi: TodoAPI): void {
-  const presentation = new TodoPresentation(),
+  const handoff = new PlannotatorHandoff(pi),
+    presentation = new TodoPresentation(),
     work = new TodoWork(pi, presentation);
   work.register(pi);
   pi.registerTool({
@@ -59,8 +67,10 @@ export default function piTodo(pi: TodoAPI): void {
   pi.on("session_start", (_event, ctx) => {
     presentation.start(pi, ctx);
     work.start(ctx);
+    handoff.start(ctx);
   });
   pi.on("session_shutdown", () => {
+    handoff.stop();
     work.stop();
   });
   pi.on("session_tree", (_event, ctx) => {
