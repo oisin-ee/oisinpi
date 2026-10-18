@@ -1,5 +1,15 @@
 # @oisin-ee/oisinpi
 
+## 0.5.1
+
+### Patch Changes
+
+- [`0170caa`](https://github.com/oisin-ee/oisinpi/commit/0170caa9c59c4e3d71409627b14925cefcc68679) Thanks [@momo-momokaya[bot]](https://github.com/momo-momokaya%5Bbot%5D)! - Bundle pi-wrangle 0.12.2. Show the current task and named agents and jobs above the editor. Alt+W and `/work` expand the same widget in place, without a popup or editor replacement.
+- Updated dependencies []:
+  - @oisin-ee/pi-guardrails@0.5.1
+  - @oisin-ee/pi-prewalk@0.5.1
+  - @oisin-ee/pi-todo@0.5.1
+
 ## 0.5.0
 
 ### Minor Changes
