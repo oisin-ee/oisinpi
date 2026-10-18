@@ -45,12 +45,15 @@ Outside the terminal UI, `/todos` prints the list instead.
 ## Shared work display
 
 When a compatible pi-wrangle extension is active, its `WORK` strip replaces the standalone todo widget.
-Tasks remain on the current Pi session branch. Wrangle receives read-only snapshots through `pi.events`.
+Tasks remain on the current Pi session branch. Wrangle receives a read-only presentation capability through `pi.events`.
+Pi-todo owns the renderer in both standalone and shared views. Wrangle hosts it above the editor without opening a popup.
+Alt+J/K scrolls the hosted rows. Alt+I toggles their expansion. Ordinary editor keys remain unchanged.
 `/todos` and Alt+T request the shared Todos view. `/todos list` still prints the full list.
 When shared presentation ends, the standalone widget returns without changing task state.
 
-The [version 1 display contract](https://github.com/oisin-ee/wrangle/blob/main/docs/pi-work.md)
+The [version 2 display contract](https://github.com/oisin-ee/wrangle/blob/main/docs/pi-work.md)
 defines the snapshot request, acknowledgement, release, and read-only view events.
+Incompatible versions leave the standalone widget available. Rendering failures restore it without changing saved tasks.
 
 ## Plannotator plans
 

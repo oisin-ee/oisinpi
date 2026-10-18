@@ -16,8 +16,9 @@ const TODO_SHORTCUT = "alt+t",
 
 /** The presentation-only component; task state stays on the session branch. */
 class TodoWidget extends Text {
-  readonly #rows: readonly Readonly<WidgetRow>[];
-  readonly #expanded: boolean;
+  #rows: readonly Readonly<WidgetRow>[];
+  #expanded: boolean;
+  #shortcut = "Alt+T";
   readonly #theme: Readonly<Pick<Theme, "fg" | "bold">>;
 
   /**
@@ -38,6 +39,25 @@ class TodoWidget extends Text {
   }
 
   /**
+   * Updates rows without replacing the host's scrollable component.
+   * @param {readonly Readonly<WidgetRow>[]} rows Updated semantic rows.
+   * @param {boolean} expanded Whether secondary groups are visible.
+   */
+  public setRows(rows: readonly Readonly<WidgetRow>[], expanded: boolean): void {
+    this.#rows = rows;
+    this.#expanded = expanded;
+    this.invalidate();
+  }
+
+  /**
+   * Uses the shortcut owned by the containing surface.
+   * @param {string} shortcut The host's display shortcut.
+   */
+  public setShortcut(shortcut: string): void {
+    this.#shortcut = shortcut;
+  }
+
+  /**
    * Wraps all task text with Pi's native terminal component.
    * @param {number} width Available terminal columns.
    * @returns {string[]} Width-bounded, themed terminal lines.
@@ -48,7 +68,7 @@ class TodoWidget extends Text {
         return row.kind === "active" ? this.#theme.bold(text) : text;
       }),
       action = this.#expanded ? "collapse" : "upcoming / done";
-    lines.push(this.#theme.fg("dim", `Alt+T · ${action}`));
+    lines.push(this.#theme.fg("dim", `${this.#shortcut} · ${action}`));
     this.setText(lines.join("\n"));
     return super.render(width).map((line) => truncateToWidth(line, width));
   }

@@ -3,6 +3,7 @@ import { ownsTodo, show } from "./lifecycle.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { TODO_SHORTCUT } from "./widget.ts";
 import type { TodoPresentation } from "./presentation.ts";
+import { display } from "./display.ts";
 import { latestSnapshot } from "./state.ts";
 import { parse } from "./wasm.ts";
 
@@ -11,7 +12,7 @@ interface WorkHost extends TodoHost {
 }
 
 type WorkCommands = Readonly<Pick<ExtensionAPI, "registerCommand" | "registerShortcut">>;
-const protocolVersion = 1,
+const protocolVersion = 2,
   initialRevision = 0;
 
 interface WorkContext extends TodoContext {
@@ -129,7 +130,10 @@ class TodoWork {
         }
       }),
     ];
-    this.#host.events.emit("oisin.todo.ready", { publisher: this.#publisher, version: 1 });
+    this.#host.events.emit("oisin.todo.ready", {
+      publisher: this.#publisher,
+      version: protocolVersion,
+    });
   }
 
   /**
@@ -145,13 +149,13 @@ class TodoWork {
     const list = parse(latestSnapshot(ctx.sessionManager.getBranch()));
     this.#host.events.emit("oisin.todo.snapshot", {
       branch: ctx.sessionManager.getLeafId(),
+      display: display(list),
       presenter: this.#presenter.presenter,
       publisher: this.#publisher,
       request: this.#presenter.request,
       revision: this.#revision,
       session: ctx.sessionManager.getSessionId(),
-      tasks: list.tasks,
-      version: 1,
+      version: protocolVersion,
     });
   }
 
@@ -166,7 +170,7 @@ class TodoWork {
     this.#host.events.emit("oisin.work.open", {
       presenter: this.#presenter.presenter,
       request: this.#presenter.request,
-      version: 1,
+      version: protocolVersion,
       view: "todos",
     });
     return true;
@@ -179,7 +183,10 @@ class TodoWork {
     }
     this.#subscriptions = [];
     if (this.#context !== undefined) {
-      this.#host.events.emit("oisin.todo.stop", { publisher: this.#publisher, version: 1 });
+      this.#host.events.emit("oisin.todo.stop", {
+        publisher: this.#publisher,
+        version: protocolVersion,
+      });
     }
     this.#release();
     this.#context = undefined;

@@ -74,7 +74,7 @@ const firstArgument = 0,
       work = new TodoWork(host, new TodoPresentation()),
       snapshot = vi.fn<Listener>(),
       opened = vi.fn<Listener>(),
-      envelope = { presenter: "work", request: "request", version: 1 };
+      envelope = { presenter: "work", request: "request", version: 2 };
     events.on("oisin.todo.snapshot", snapshot);
     events.on("oisin.work.open", opened);
     return {
@@ -102,7 +102,12 @@ describe("work provider", () => {
     test.work.start(test.ctx);
     test.request();
     expect(test.snapshot).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({ branch: null, revision: 1, session: "session", tasks: [] }),
+      expect.objectContaining({
+        branch: null,
+        revision: 1,
+        session: "session",
+        version: 2,
+      }),
     );
     expect(test.ctx.ui.setWidget).not.toHaveBeenCalled();
     test.work.stop();
@@ -118,7 +123,7 @@ describe("work provider", () => {
     expect(test.opened).toHaveBeenCalledExactlyOnceWith({
       presenter: "work",
       request: "request",
-      version: 1,
+      version: 2,
       view: "todos",
     });
     test.release();
@@ -131,7 +136,7 @@ describe("work provider", () => {
     const test = fixture();
     test.work.start(test.ctx);
     test.request();
-    test.claim({ presenter: "old", request: "old", version: 1 });
+    test.claim({ presenter: "old", request: "old", version: 2 });
     expect(test.work.open()).toBe(false);
     test.work.stop();
     test.request();
