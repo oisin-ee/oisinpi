@@ -23,18 +23,25 @@ pub enum Item {
     Text(String),
     Outcome {
         content: String,
+        #[cfg_attr(feature = "wasm", tsify(type = "readonly string[]"))]
         subtasks: Vec<String>,
     },
 }
 
 /// Exact task content, scoped by an optional root parent.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
 #[serde(deny_unknown_fields)]
 pub struct Request {
     pub op: Operation,
+    #[cfg_attr(
+        feature = "wasm",
+        tsify(optional, type = "readonly Item[] | undefined")
+    )]
     pub items: Option<Vec<Item>>,
+    #[cfg_attr(feature = "wasm", tsify(optional, type = "string | undefined"))]
     pub task: Option<String>,
+    #[cfg_attr(feature = "wasm", tsify(optional, type = "string | undefined"))]
     pub parent: Option<String>,
 }
 

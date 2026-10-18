@@ -1,5 +1,6 @@
 //! Branch-local outcomes and bounded work units, addressed by exact content.
 
+mod deserialization;
 mod operations;
 mod reminder;
 mod widget;
@@ -31,45 +32,15 @@ impl Status {
 }
 
 /// A leaf work unit. Grandchildren are not accepted.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
-#[serde(try_from = "ChildFields")]
 pub struct Subtask {
     pub content: String,
     pub status: Status,
 }
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ChildFields {
-    content: String,
-    status: Status,
-    #[serde(default, deserialize_with = "child_depth")]
-    subtasks: Option<serde::de::IgnoredAny>,
-}
-
-fn child_depth<'de, D: serde::Deserializer<'de>>(
-    deserializer: D,
-) -> Result<Option<serde::de::IgnoredAny>, D::Error> {
-    serde::de::IgnoredAny::deserialize(deserializer).map(Some)
-}
-
-impl TryFrom<ChildFields> for Subtask {
-    type Error = TodoError;
-
-    fn try_from(fields: ChildFields) -> Result<Self, Self::Error> {
-        if fields.subtasks.is_some() {
-            return Err(TodoError::InvalidRequest);
-        }
-        Ok(Self {
-            content: fields.content,
-            status: fields.status,
-        })
-    }
-}
-
 /// An outcome, optionally divided into bounded work units.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
 #[serde(deny_unknown_fields)]
 pub struct Task {
@@ -90,7 +61,7 @@ impl Task {
 }
 
 /// The whole todo list of a session branch.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
 #[serde(deny_unknown_fields)]
 pub struct TodoList {
