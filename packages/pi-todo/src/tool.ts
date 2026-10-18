@@ -48,14 +48,7 @@ const result = (list: TodoList, creation: boolean): TodoResult => ({
    */
   runTodo = (params: TodoParams, session: TodoSession): TodoResult => {
     const current = parse(latestSnapshot(session.branch())),
-      { list, persist } = apply(current, {
-        items: params.items?.map((item) =>
-          typeof item === "string" ? item : { content: item.content, subtasks: [...item.subtasks] },
-        ),
-        op: params.op,
-        parent: params.parent,
-        task: params.task,
-      });
+      { list, persist } = apply(current, params);
     if (persist) {
       session.append(STATE_ENTRY, list);
     }

@@ -3,6 +3,7 @@ import { apply, init, parse, view, widget } from "./wasm.ts";
 import { describe, expect, it } from "vitest";
 import { TodoView } from "./embedded.ts";
 import { display } from "./display.ts";
+import { runTodo } from "./tool.ts";
 
 const width = 80,
   height = 30,
@@ -74,7 +75,117 @@ describe("hierarchical WASM callers", () => {
   );
 });
 
+describe("strict operation input", () => {
+  it.each([
+    { op: "view", unexpected: true },
+    { items: [{ content: "Root", subtasks: [], unexpected: true }], op: "init" },
+  ] as const)("rejects unknown fields without persisting %j", { timeout: 5000 }, (params) => {
+    expect.hasAssertions();
+    const stored: TodoList[] = [];
+    expect(() =>
+      runTodo(params, {
+        append: (_kind, list) => {
+          stored.push(list);
+        },
+        branch: () => [],
+      }),
+    ).toThrow(/unknown field|untagged enum Item/u);
+    expect(stored).toStrictEqual([]);
+  });
+});
+
+describe("strict WASM operation input", () => {
+  it("rejects unknown request and outcome keys directly in WASM", { timeout: 5000 }, () => {
+    expect.hasAssertions();
+    const request: Request = {
+        items: undefined,
+        op: "view",
+        parent: undefined,
+        task: undefined,
+      },
+      invalidRequest = Object.assign({}, request, { unexpected: true }),
+      invalidOutcome = Object.assign({}, outcome, { unexpected: true });
+    expect(() => apply(create(), invalidRequest)).toThrow("unknown field `unexpected`");
+    expect(() =>
+      apply(
+        create(),
+        Object.assign({}, request, {
+          items: [invalidOutcome],
+          op: "init" as const,
+        }),
+      ),
+    ).toThrow("untagged enum Item");
+  });
+
+  it(
+    "rejects duplicate request keys even when the first value is absent",
+    { timeout: 5000 },
+    () => {
+      expect.hasAssertions();
+      const request = {
+        items: undefined,
+        op: "view" as const,
+        parent: undefined,
+        task: undefined,
+        [Symbol.iterator]: (): IterableIterator<unknown> =>
+          [
+            ["op", "view"],
+            ["task", undefined],
+            ["task", undefined],
+          ].values(),
+      };
+      expect(() => apply(create(), request)).toThrow("duplicate field `task`");
+    },
+  );
+});
+
+// Iterable pairs preserve duplicate keys that ordinary JavaScript objects cannot represent.
+describe("duplicate snapshot keys", () => {
+  it.each([
+    {
+      tasks: [],
+      [Symbol.iterator]: (): IterableIterator<unknown> =>
+        [
+          ["tasks", []],
+          ["tasks", []],
+        ].values(),
+    },
+    {
+      tasks: [
+        [
+          ["content", "Root"],
+          ["content", "Root"],
+          ["status", "pending"],
+        ],
+      ],
+    },
+    {
+      tasks: [
+        {
+          content: "Root",
+          status: "pending",
+          subtasks: [
+            [
+              ["content", "Child"],
+              ["status", "pending"],
+              ["status", "pending"],
+            ],
+          ],
+        },
+      ],
+    },
+  ])("rejects repeated map entries %j", { timeout: 5000 }, (snapshot: unknown) => {
+    expect.hasAssertions();
+    expect(() => parse(snapshot)).toThrow("duplicate field");
+  });
+});
+
 describe("snapshot validation", () => {
+  it("enumerates unknown list keys through the real WASM map visitor", { timeout: 5000 }, () => {
+    expect.hasAssertions();
+    expect(() => parse({ tasks: [], unexpected: true })).toThrow("unknown field `unexpected`");
+  });
+
   it("reads old snapshots without normalization", { timeout: 5000 }, () => {
     expect.hasAssertions();
     expect(parse({ tasks: [{ content: "Old", status: "in_progress" }] })).toStrictEqual({
@@ -101,6 +212,17 @@ describe("snapshot validation", () => {
         },
       ],
     },
+    { tasks: [], unexpected: true },
+    { tasks: [{ content: "Root", status: "pending", unexpected: true }] },
+    {
+      tasks: [
+        {
+          content: "Root",
+          status: "pending",
+          subtasks: [{ content: "Child", status: "pending", unexpected: true }],
+        },
+      ],
+    },
     { tasks: [{ content: " ", status: "pending" }] },
     {
       tasks: [
@@ -119,6 +241,6 @@ describe("snapshot validation", () => {
     },
   ])("rejects malformed state %j", { timeout: 5000 }, (snapshot: unknown) => {
     expect.hasAssertions();
-    expect(() => parse(snapshot)).toThrow(/Missing|Duplicate|Invalid|open subtasks/u);
+    expect(() => parse(snapshot)).toThrow(/Missing|Duplicate|Invalid|open subtasks|unknown field/u);
   });
 });
