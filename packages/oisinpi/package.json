@@ -1,6 +1,6 @@
 {
   "name": "@oisin-ee/oisinpi",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Oisin's pi packages in one install: prewalk, todo, wrangle, and guardrails.",
   "keywords": [
     "guardrails",
