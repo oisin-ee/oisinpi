@@ -115,7 +115,7 @@ Malformed events, a different working directory, or another owner of the `todo` 
 
 ## Reminder
 
-When the agent stops with open tasks, pi-todo adds a hidden reminder and continues the turn.
+When the agent stops with open tasks, pi-todo adds a visible reminder to the conversation and continues the turn.
 The reminder names open children and parents that await integration review.
 It sends at most 3 reminders per user message. After a reminder, it waits for the list to change before it sends
 another. A new user message resets the count.

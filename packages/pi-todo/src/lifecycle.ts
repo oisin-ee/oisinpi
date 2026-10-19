@@ -61,7 +61,7 @@ const ownsTodo = (pi: TodoHost): boolean =>
    * @param {TodoHost} pi Tool metadata reader.
    * @param {SettleEvent} event The boundary facts.
    * @param {TodoContext} ctx Branch and UI methods.
-   * @returns {BoundaryResult} The unchanged boundary or an added hidden reminder.
+   * @returns {BoundaryResult} The unchanged boundary or an added visible reminder.
    */
   settle = (pi: TodoHost, event: SettleEvent, ctx: TodoContext): BoundaryResult => {
     if (event.outcome !== "completed" || event.continue || !ownsTodo(pi)) {
@@ -73,7 +73,7 @@ const ownsTodo = (pi: TodoHost): boolean =>
           continue: true,
           entries: [
             ...event.entries,
-            { content, customType: REMINDER_ENTRY, display: false, type: "custom_message" },
+            { content, customType: REMINDER_ENTRY, display: true, type: "custom_message" },
           ],
         }
       : {};

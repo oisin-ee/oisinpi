@@ -175,7 +175,7 @@ describe("collision", () => {
 });
 
 describe("settlement", () => {
-  it("adds a hidden reminder and preserves prior drafts", { timeout: 5000 }, () => {
+  it("adds a visible reminder and preserves prior drafts", { timeout: 5000 }, () => {
     expect.hasAssertions();
     const prior = { customType: "other", type: "custom" as const },
       test = fixture(),
@@ -184,7 +184,7 @@ describe("settlement", () => {
     expect(settle(test.host, withPrior, test.ctx)).toMatchObject({ continue: true });
     expect(settle(test.host, withPrior, test.ctx).entries).toMatchObject([
       prior,
-      { customType: REMINDER_ENTRY, display: false, type: "custom_message" },
+      { customType: REMINDER_ENTRY, display: true, type: "custom_message" },
     ]);
     expect(JSON.stringify(settle(test.host, withPrior, test.ctx))).toContain("Reminder 1/3");
   });
