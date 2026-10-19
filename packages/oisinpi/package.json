@@ -21,7 +21,7 @@
     "@oisin-ee/pi-guardrails": "workspace:*",
     "@oisin-ee/pi-prewalk": "workspace:*",
     "@oisin-ee/pi-todo": "workspace:*",
-    "@oisin-ee/pi-wrangle": "0.12.2"
+    "@oisin-ee/pi-wrangle": "0.12.3"
   },
   "bundleDependencies": [
     "@oisin-ee/pi-guardrails",
