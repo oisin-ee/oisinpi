@@ -1,5 +1,11 @@
 # @oisin-ee/pi-todo
 
+## 0.7.1
+
+### Patch Changes
+
+- [`b2ebd5a`](https://github.com/oisin-ee/oisinpi/commit/b2ebd5aefa0a52d84e7685c014fef5203e30e3a3) Thanks [@momo-momokaya[bot]](https://github.com/momo-momokaya%5Bbot%5D)! - Show completion reminders in the conversation. Reminder limits and continuation behavior remain unchanged.
+
 ## 0.7.0
 
 No changes in this release.
