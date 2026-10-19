@@ -362,6 +362,7 @@ test("agent typing: refuses typing into another agent's terminal and allows the 
     "herdr --session main agent prompt w1:p1 hi",
     "HERDR_ENV=1 timeout 5 herdr agent prompt w1:p1 'hi there'",
     "herdr agent send-keys w1:p1 Enter",
+    "herdr agent send-keys w1:p1 Enter # wrangle: answer-prompt",
     "herdr pane send-text w1:p1 hello",
     "herdr pane send-keys w1:p1 Enter",
     "herdr pane send-input w1:p1 hello",
@@ -372,8 +373,8 @@ test("agent typing: refuses typing into another agent's terminal and allows the 
     assert.equal(check(command), TYPING_MSG, String(command));
   }
   for (const command of [
-    "wrangle send w1:p1 --message hi",
-    "wrangle send worker --message 'herdr agent prompt is gone'",
+    "dogsled send w1:p1 --message hi",
+    "dogsled send worker --message 'herdr agent prompt is gone'",
     "herdr pane send-text w1:p9 'ls -la'",
     "herdr pane send-keys w1:p2 Enter",
     "herdr pane read w1:p1 --source visible",
@@ -383,7 +384,7 @@ test("agent typing: refuses typing into another agent's terminal and allows the 
   }
 });
 
-test("agent typing: the answer-prompt marker allows agent send-keys and records it", async () => {
+test("agent typing: the dogsled answer-prompt marker allows agent send-keys and records it", async () => {
   const { mkdtempSync, readFileSync } = await import("node:fs"),
     { tmpdir } = await import("node:os"),
     { join } = await import("node:path"),
@@ -392,7 +393,7 @@ test("agent typing: the answer-prompt marker allows agent send-keys and records 
     previous = process.env["XDG_STATE_HOME"];
   process.env["XDG_STATE_HOME"] = state;
   try {
-    const command = "herdr agent send-keys w1:p1 Enter # wrangle: answer-prompt";
+    const command = "herdr agent send-keys w1:p1 Enter # dogsled: answer-prompt";
     assert.equal(
       classifyAgentTyping(command, "/repo", () => true, "w1:p2"),
       null,
@@ -406,7 +407,7 @@ test("agent typing: the answer-prompt marker allows agent send-keys and records 
     // The marker never lets text through.
     assert.notEqual(
       classifyAgentTyping(
-        "herdr agent prompt w1:p1 hi # wrangle: answer-prompt",
+        "herdr agent prompt w1:p1 hi # dogsled: answer-prompt",
         "/repo",
         () => true,
         "w1:p2",

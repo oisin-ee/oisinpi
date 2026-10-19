@@ -27,7 +27,7 @@ The startup flags are `--prewalk`, `--no-prewalk`, and `--prewalk-into provider/
 Do not combine `--no-prewalk` with either arming flag.
 Flags affect only the startup session. New sessions use `enabled` from config. Resumed sessions do not arm automatically.
 
-For a wrangle child, add `"pi_args": ["--prewalk-into", "alias/luna"]` to its profile.
+For a dogsled child, add `"pi_args": ["--prewalk-into", "alias/luna"]` to its profile.
 To suppress configured prewalk for that child, use `"pi_args": ["--no-prewalk"]`.
 
 ## State and context
