@@ -1,5 +1,18 @@
 # @oisin-ee/oisinpi
 
+## 0.7.0
+
+### Minor Changes
+
+- [`5a49c73`](https://github.com/oisin-ee/oisinpi/commit/5a49c7387a1be43057bb881c34794347de3769b1) Thanks [@oisincoveney](https://github.com/oisincoveney)! - Remove pi-wrangle from the collection. Install `npm:@oisin-ee/pi-wrangle` on its own, at the same version as the `wrangle` binary, so a wrangle release no longer needs an oisinpi release. The collection now bundles pi-prewalk, pi-todo, and pi-guardrails.
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @oisin-ee/pi-guardrails@0.7.0
+  - @oisin-ee/pi-prewalk@0.7.0
+  - @oisin-ee/pi-todo@0.7.0
+
 ## 0.6.0
 
 ### Patch Changes
