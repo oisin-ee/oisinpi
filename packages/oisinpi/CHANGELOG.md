@@ -1,5 +1,15 @@
 # @oisin-ee/oisinpi
 
+## 0.6.0
+
+### Patch Changes
+
+- [`16abba6`](https://github.com/oisin-ee/oisinpi/commit/16abba6b96e8ca0106a011e0fe4629396839b08c) Thanks [@oisincoveney](https://github.com/oisincoveney)! - Bundle pi-wrangle 0.12.3. The widget above the editor uses the wrangle board design again: host meters, the current task, and agents and jobs grouped TO LAND, ATTENTION, RUNNING, and WAITING with aligned columns. Alt+W and `/work` still expand it in place. Wrangle hosts pi-todo's display protocol version 2 view inline.
+- Updated dependencies [[`eb67440`](https://github.com/oisin-ee/oisinpi/commit/eb674408bf1dfbdfec7fd319c3863ad05b3d730d)]:
+  - @oisin-ee/pi-todo@0.6.0
+  - @oisin-ee/pi-guardrails@0.6.0
+  - @oisin-ee/pi-prewalk@0.6.0
+
 ## 0.5.1
 
 ### Patch Changes

@@ -1,5 +1,17 @@
 # @oisin-ee/pi-todo
 
+## 0.6.0
+
+### Minor Changes
+
+- [`eb67440`](https://github.com/oisin-ee/oisinpi/commit/eb674408bf1dfbdfec7fd319c3863ad05b3d730d) Thanks [@momo-momokaya[bot]](https://github.com/momo-momokaya%5Bbot%5D)! - Add two-level outcomes and bounded subtasks with exact parent-scoped targets. Creation stays pending, and explicit starts preserve parallel active work. Automatic activation is removed.
+
+  Keep parents open for explicit integration review after children close. Reject premature completion atomically. Preserve completed children when dropping a parent.
+
+  Show hierarchy and separate progress in shared rendering, model output, and reminders. Add work-unit guidance to tool results and approved-plan continuation. Old flat snapshots remain readable.
+
+  Pi-todo now supplies the renderer hosted by Wrangle's inline widget through display protocol version 2. Shared presentation requires a matching Wrangle release. Older integrations retain standalone todos instead of flattening subtasks.
+
 ## 0.5.1
 
 No changes in this release.
