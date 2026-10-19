@@ -6,7 +6,7 @@ Agent guardrails for [pi](https://pi.dev), Claude Code, and Codex. One set of po
   under `.worktrees/`, no on-the-fly identity.
 - **Wait gate:** no `sleep`, `watch`, follow flags, `--wait`/`--watch`, or wait subcommands. Start long work in the
   background instead.
-- **Agent typing:** no `herdr agent prompt` or `pane send-*` into another agent's terminal. Use `wrangle send`.
+- **Agent typing:** no `herdr agent prompt` or `pane send-*` into another agent's terminal. Use `dogsled send`. For prompt answers, only `herdr agent send-keys` accepts `# dogsled: answer-prompt`; each use is recorded.
 - **GitOps:** no imperative `kubectl`, `helm`, `argocd`, or `nix` mutations, and no `fsck`/`mkfs`.
 - **Generated paths:** no hand-edits of lockfiles or generated files.
 

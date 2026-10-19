@@ -3,8 +3,8 @@
 Oisin's [pi](https://pi.dev) packages. Prewalk is a planner-to-executor handoff: a frontier model explores the code,
 writes a todo list, and makes the first edit, then the same session switches once to a cheaper model. The semantics
 follow oh-my-pi's [prewalk](https://github.com/can1357/oh-my-pi/blob/e7fe318/packages/coding-agent/src/session/prewalk.ts).
-The guardrails are the hook policies for pi, Claude Code, and Codex. pi-wrangle is published from
-[oisin-ee/wrangle](https://github.com/oisin-ee/wrangle) and installs on its own, at the `wrangle` binary's version.
+The guardrails are the hook policies for pi, Claude Code, and Codex. pi-dogsled is published from
+[oisin-ee/dogsled](https://github.com/oisin-ee/dogsled) and installs on its own, at the `dogsled` binary's version.
 
 | Package                                             | Contents                                              |
 | --------------------------------------------------- | ----------------------------------------------------- |

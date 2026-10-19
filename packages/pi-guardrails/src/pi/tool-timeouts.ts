@@ -41,8 +41,8 @@ export function codeWaitViolation(
   }
   return CODE_WAITS.some((pattern) => pattern.test(code))
     ? "wait-gate: blocked a sleep or timer wait in sandbox code. Never hold a tool call to wait. Start long work with " +
-        "Wrangle `run` (mcp__wrangle__run) and continue other work. Use `read` (mcp__wrangle__read) for output " +
-        "and `stop` (mcp__wrangle__stop) to cancel the job."
+        "Dogsled `run` (mcp__dogsled__run) and continue other work. Use `read` (mcp__dogsled__read) for output " +
+        "and `stop` (mcp__dogsled__stop) to cancel the job."
     : null;
 }
 
@@ -62,8 +62,8 @@ function limitMessage(
   return (
     `timeout-gate: blocked ${toolName} ${field}=${value}. The ${field} unit is ${unit === "s" ? "seconds" : "milliseconds"} ` +
     `and the limit is ${max} (${MAX_TIMEOUT_SECONDS / 60} minutes).${unitHint} ` +
-    "For a longer job, start it with Wrangle `run` (mcp__wrangle__run) and continue other work. " +
-    "Use `read` (mcp__wrangle__read) for output and `stop` (mcp__wrangle__stop) to cancel the job. " +
+    "For a longer job, start it with Dogsled `run` (mcp__dogsled__run) and continue other work. " +
+    "Use `read` (mcp__dogsled__read) for output and `stop` (mcp__dogsled__stop) to cancel the job. " +
     "For CI, use the ci_find and ci_watch tools."
   );
 }

@@ -42,7 +42,7 @@ export const SHELL_MSG = {
     "git-gate: blocked creating or resetting a branch. Per rules/30-safety-and-delivery.md, create new branches with " +
     "git worktree add -b <branch> .worktrees/<name> [<commit-ish>], or with git branch/switch -c/checkout -b " +
     "inside an agent-owned linked worktree. For a delegated child's branch, run " +
-    "`wrangle place --branch <branch> --base origin/main` instead (rules/20-delegation.md). " +
+    "`dogsled place --branch <branch> --base origin/main` instead (rules/20-delegation.md). " +
     "Forced branch resets (-B, -C, -f) are never allowed.",
   clean:
     'git-gate: blocked "git clean -f" which permanently deletes untracked files. Per rules/30-safety-and-delivery.md, ' +
@@ -74,16 +74,16 @@ export const SHELL_MSG = {
   worktree:
     "git-gate: blocked creating a worktree outside repo-local .worktrees/. Per rules/30-safety-and-delivery.md, " +
     "worktrees must use git worktree add [-b <branch>] .worktrees/<name> [<commit-ish>]. For a delegated child's " +
-    "worktree, run `wrangle place --branch <branch> --base origin/main` instead (rules/20-delegation.md).",
+    "worktree, run `dogsled place --branch <branch> --base origin/main` instead (rules/20-delegation.md).",
 };
 
 export const TYPING_MSG =
   "agent-typing: blocked typing into another agent's terminal. Typed text lands in the user's draft and mixes " +
-  "with it. Message the agent through its wrangle inbox instead: the `send` tool (mcp__wrangle__send) or " +
-  "`wrangle send <name-or-pane> --message <text>`. To answer a prompt dialog in another pane with keys, add " +
-  "`# wrangle: answer-prompt` to `herdr agent send-keys`; each such use is recorded.";
+  "with it. Message the agent through its dogsled inbox instead: the `send` tool (mcp__dogsled__send) or " +
+  "`dogsled send <name-or-pane> --message <text>`. To answer a prompt dialog in another pane with keys, add " +
+  "`# dogsled: answer-prompt` to `herdr agent send-keys`; each such use is recorded.";
 
-const ANSWER_PROMPT = /#\s*wrangle:\s*answer-prompt\b/u,
+const ANSWER_PROMPT = /#\s*dogsled:\s*answer-prompt\b/u,
   HERDR_VALUE_OPTIONS: ReadonlySet<string> = new Set(["--session", "--machine", "--remote"]),
   PANE_TYPING: ReadonlySet<string> = new Set(["send-text", "send-keys", "send-input"]);
 
@@ -161,7 +161,7 @@ function shellPieces(words: Words): string | null {
 
 // Typing into another agent's terminal: `herdr agent prompt`, `herdr agent send-keys`, and
 // `herdr pane send-text|send-keys|send-input` aimed at a pane that runs an agent. `agent send-keys` with
-// `# wrangle: answer-prompt` on the command line is allowed and recorded. The caller's own pane is not
+// `# dogsled: answer-prompt` on the command line is allowed and recorded. The caller's own pane is not
 // Another agent's. `isAgent` is the pane lookup; the second argument is the cwd every classifier receives.
 export function classifyAgentTyping(
   command: Command,
@@ -229,8 +229,8 @@ export const IMPERATIVE_MSG = {
 export const WAIT_MSG =
   "wait-gate: blocked a command that waits instead of working (sleep, watch, a follow flag, a --watch or --wait " +
   "flag, or a wait subcommand). Never hold a tool call to wait, and never re-read a log to check progress. " +
-  "For long work in pi, use Wrangle `run` (mcp__wrangle__run) and continue other work. " +
-  "Use `read` (mcp__wrangle__read) for output and `stop` (mcp__wrangle__stop) to cancel the job. " +
+  "For long work in pi, use Dogsled `run` (mcp__dogsled__run) and continue other work. " +
+  "Use `read` (mcp__dogsled__read) for output and `stop` (mcp__dogsled__stop) to cancel the job. " +
   "Start long work so the host reports its exit: in Claude Code, `run_in_background` " +
   "or Monitor (the exit arrives as a message); in Codex, exec_command, then empty write_stdin calls, which " +
   "return when the process exits. " +

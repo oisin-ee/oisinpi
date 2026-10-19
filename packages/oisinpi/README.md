@@ -15,11 +15,11 @@ pi install npm:@oisin-ee/oisinpi
 The collection bundles the three packages in its tarball and adds no code. No member imports another, so each one also
 installs by itself.
 
-pi-wrangle is not in the collection. Install it on its own, at the same version as the `wrangle` binary
-([oisin-ee/wrangle](https://github.com/oisin-ee/wrangle)):
+pi-dogsled is not in the collection. Install it on its own, at the same version as the `dogsled` binary
+([oisin-ee/dogsled](https://github.com/oisin-ee/dogsled)):
 
 ```bash
-pi install npm:@oisin-ee/pi-wrangle@<wrangle version>
+pi install npm:@oisin-ee/pi-dogsled@<dogsled version>
 ```
 
-When pi-wrangle is active, its work widget hosts pi-todo's view. Without it, pi-todo keeps its own widget.
+When pi-dogsled is active, its work widget hosts pi-todo's view. Without it, pi-todo keeps its own widget.
