@@ -1,5 +1,11 @@
 # @oisin-ee/pi-guardrails
 
+## 0.7.2
+
+### Patch Changes
+
+- [#16](https://github.com/oisin-ee/oisinpi/pull/16) [`f31e9a6`](https://github.com/oisin-ee/oisinpi/commit/f31e9a6043d5b7cbe351540b51f87eadf85c9af3) Thanks [@momo-momokaya](https://github.com/apps/momo-momokaya)! - Use Dogsled commands and MCP tool names in guardrail guidance. Require `# dogsled: answer-prompt` for prompt answers; the old marker no longer authorizes keys. Update current documentation to the Dogsled consumer contract.
+
 ## 0.7.1
 
 No changes in this release.
