@@ -24,7 +24,7 @@ import piTodo from "./index.ts";
 type Session = Awaited<ReturnType<typeof createAgentSession>>["session"];
 interface RuntimeFixture {
   readonly session: Readonly<Pick<Session, "dispose" | "abort" | "messages">> & {
-    readonly extensionRunner: Readonly<Pick<Session["extensionRunner"], "emitToolResult">>;
+    readonly extensionRunner: Readonly<Pick<Session["extensionRunner"], "emitToolResult" | "emit">>;
   };
   readonly manager: SessionManager;
   readonly provider: () => TaskProviderV1;

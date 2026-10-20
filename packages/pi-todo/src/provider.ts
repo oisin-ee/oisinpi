@@ -70,6 +70,7 @@ class TaskProvider {
   readonly #leases = new Map<string, UnitRef>();
   #context: ExtensionContext | undefined;
   #mutating = false;
+  #generation = Symbol("task-provider");
 
   public constructor(host: ProviderHost) {
     this.#host = host;
@@ -95,6 +96,7 @@ class TaskProvider {
 
   /** Removes runtime-only leases on extension shutdown. */
   public stop(): void {
+    this.#generation = Symbol("task-provider");
     this.#leases.clear();
     this.#context = undefined;
   }
@@ -132,14 +134,17 @@ class TaskProvider {
    * @returns {TaskProviderV1} Extension-only capability.
    */
   public capability(): TaskProviderV1 {
+    const generation = this.#generation,
+      respond = <Value>(operation: () => Value): Result<Value> =>
+        this.#respond(generation, operation);
     return {
       active: () =>
-        result(() => {
+        respond(() => {
           const session = this.#session();
           return active(branchSnapshot(session.branch()), session.sessionId) ?? null;
         }),
       claim: (input) =>
-        result(() =>
+        respond(() =>
           this.#mutation(() => {
             const session = this.#session(),
               change = claim(
@@ -154,13 +159,13 @@ class TaskProvider {
           }),
         ),
       imported: () =>
-        result(() => {
+        respond(() => {
           this.#session();
           return null;
         }),
-      inspect: (id) => result(() => inspect(branchSnapshot(this.#session().branch()), id)),
+      inspect: (id) => respond(() => inspect(branchSnapshot(this.#session().branch()), id)),
       settle: (input) =>
-        result(() =>
+        respond(() =>
           this.#mutation(() => {
             const session = this.#session(),
               change = settle(
@@ -175,6 +180,15 @@ class TaskProvider {
           }),
         ),
     };
+  }
+
+  #respond<Value>(generation: symbol, operation: () => Value): Result<Value> {
+    return result(() => {
+      if (generation !== this.#generation) {
+        throw new Error("PROVIDER_UNAVAILABLE: capability belongs to a closed runtime");
+      }
+      return operation();
+    });
   }
 
   #mutation<Value>(operation: () => Value): Value {

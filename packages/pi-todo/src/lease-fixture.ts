@@ -1,6 +1,39 @@
+import { contract, firstId } from "./contract-fixture.ts";
 import { emptyParameters, emptyResult, runtimeFixture } from "./runtime-fixture.ts";
 import { branchSnapshot } from "./state.ts";
-import { firstId } from "./contract-fixture.ts";
+
+/**
+ * Completes an unrelated unit on a fresh branch.
+ * @param {Readonly<object>} test Runtime task and branch operations.
+ */
+const unrelated = async (test: {
+  readonly manager: {
+    readonly resetLeaf: () => void;
+    readonly getBranch: () => ReturnType<
+      Awaited<ReturnType<typeof runtimeFixture>>["manager"]["getBranch"]
+    >;
+  };
+  readonly todo: Awaited<ReturnType<typeof runtimeFixture>>["todo"];
+}): Promise<void> => {
+  test.manager.resetLeaf();
+  await test.todo({
+    items: [{ content: "Other branch", contract: contract(), key: "other" }],
+    op: "init",
+    start: "other",
+  });
+  const list = branchSnapshot(test.manager.getBranch());
+  await test.todo({ evidence: "Reviewed unrelated work", op: "done", task: firstId(list) });
+};
+
+interface Leased {
+  readonly test: Awaited<ReturnType<typeof runtimeFixture>>;
+  readonly id: string;
+  readonly calls: readonly string[];
+  readonly revisit: () => void;
+  readonly unrelated: () => Promise<void>;
+  readonly finish: () => Promise<void>;
+  readonly close: () => void;
+}
 
 /**
  * Owns the controlled execution boundary used by lease regressions.
@@ -8,16 +41,7 @@ import { firstId } from "./contract-fixture.ts";
  * @param {boolean} fail Throws at the actual execute boundary when true.
  * @returns {Promise<object>} Running tool and deterministic completion controls.
  */
-const leased = async (
-  nested: boolean,
-  fail: boolean,
-): Promise<{
-  test: Awaited<ReturnType<typeof runtimeFixture>>;
-  id: string;
-  calls: readonly string[];
-  finish: () => Promise<void>;
-  close: () => void;
-}> => {
+const leased = async (nested: boolean, fail: boolean): Promise<Leased> => {
   const entered = Promise.withResolvers<boolean>(),
     finished = Promise.withResolvers<boolean>(),
     calls: string[] = [],
@@ -44,6 +68,10 @@ const leased = async (
       ? test.call("codemode", { code: "return await tools.mutation({})" })
       : test.call("mutation", {});
   await entered.promise;
+  const origin = test.manager.getLeafId();
+  if (origin === null) {
+    throw new Error("Expected leased origin branch leaf");
+  }
   return {
     calls,
     close: (): void => {
@@ -55,7 +83,12 @@ const leased = async (
       await running;
     },
     id,
+    revisit: (): void => {
+      test.manager.resetLeaf();
+      test.manager.branch(origin);
+    },
     test,
+    unrelated: async (): Promise<void> => unrelated(test),
   };
 };
 
