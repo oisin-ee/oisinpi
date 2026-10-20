@@ -25,6 +25,12 @@ WebAssembly with wasm-bindgen and tsify, and validate every input from JavaScrip
 `packages/pi-guardrails` is TypeScript only. pi loads its `src/pi/index.ts`; Claude Code and Codex run its `agent-hook`
 command, which `moon run pi-guardrails:build` compiles to `dist/` because Node does not strip types under `node_modules`.
 
+## Todo contracts
+
+The todo tool validates bounded contracts, local activation, and acceptance evidence.
+See [Executable todo contracts](docs/todo-workflows.md) for creation, migration, and scope rules.
+Worker launch and tool gating are separate integration work.
+
 ## Development
 
 The toolchain comes from `.prototools` and `rust-toolchain.toml`.

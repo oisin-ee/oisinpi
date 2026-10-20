@@ -1,5 +1,5 @@
-import { apply, init } from "./wasm.ts";
 import { describe, expect, it, vi } from "vitest";
+import { init, parse } from "./wasm.ts";
 import { TodoView } from "./embedded.ts";
 import { display } from "./display.ts";
 import { stripTerminalSequences } from "@earendil-works/pi-tui";
@@ -24,12 +24,7 @@ describe("hosted todo rendering", () => {
       component.handleInput("\r");
       expect(component.render(width).join("\n")).not.toContain("Verify integration");
       component.update(
-        apply(init(["A different branch"]), {
-          items: undefined,
-          op: "start",
-          parent: undefined,
-          task: "A different branch",
-        }).list,
+        parse({ tasks: [{ content: "A different branch", status: "in_progress" }] }),
       );
       expect(component.render(width).join("\n")).toContain("A different branch");
       component.dispose();

@@ -106,11 +106,13 @@ mod tests {
                     content: "done".to_owned(),
                     status: Status::Completed,
                     subtasks: vec![],
+                    unit: None,
                 },
                 crate::Task {
                     content: "dropped".to_owned(),
                     status: Status::Abandoned,
                     subtasks: vec![],
+                    unit: None,
                 },
             ],
         };

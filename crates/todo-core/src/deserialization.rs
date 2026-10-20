@@ -53,16 +53,17 @@ impl<'de> Visitor<'de> for TaskVisitor {
     }
 
     fn visit_map<M: MapAccess<'de>>(self, mut map: M) -> Result<Self::Value, M::Error> {
-        let (mut content, mut status, mut subtasks) = (None, None, None);
+        let (mut content, mut status, mut subtasks, mut unit) = (None, None, None, None);
         while let Some(key) = map.next_key::<String>()? {
             match key.as_str() {
                 "content" => field(&mut map, &mut content, "content")?,
                 "status" => field(&mut map, &mut status, "status")?,
                 "subtasks" => field(&mut map, &mut subtasks, "subtasks")?,
+                "unit" => field(&mut map, &mut unit, "unit")?,
                 _ => {
                     return Err(de::Error::unknown_field(
                         &key,
-                        &["content", "status", "subtasks"],
+                        &["content", "status", "subtasks", "unit"],
                     ));
                 }
             }
@@ -71,6 +72,7 @@ impl<'de> Visitor<'de> for TaskVisitor {
             content: content.ok_or_else(|| de::Error::missing_field("content"))?,
             status: status.ok_or_else(|| de::Error::missing_field("status"))?,
             subtasks: subtasks.unwrap_or_default(),
+            unit: unit.unwrap_or_default(),
         })
     }
 }
@@ -90,17 +92,24 @@ impl<'de> Visitor<'de> for SubtaskVisitor {
     }
 
     fn visit_map<M: MapAccess<'de>>(self, mut map: M) -> Result<Self::Value, M::Error> {
-        let (mut content, mut status) = (None, None);
+        let (mut content, mut status, mut unit) = (None, None, None);
         while let Some(key) = map.next_key::<String>()? {
             match key.as_str() {
                 "content" => field(&mut map, &mut content, "content")?,
                 "status" => field(&mut map, &mut status, "status")?,
-                _ => return Err(de::Error::unknown_field(&key, &["content", "status"])),
+                "unit" => field(&mut map, &mut unit, "unit")?,
+                _ => {
+                    return Err(de::Error::unknown_field(
+                        &key,
+                        &["content", "status", "unit"],
+                    ));
+                }
             }
         }
         Ok(Subtask {
             content: content.ok_or_else(|| de::Error::missing_field("content"))?,
             status: status.ok_or_else(|| de::Error::missing_field("status"))?,
+            unit: unit.unwrap_or_default(),
         })
     }
 }
@@ -121,16 +130,22 @@ impl<'de> Visitor<'de> for RequestVisitor {
 
     fn visit_map<M: MapAccess<'de>>(self, mut map: M) -> Result<Self::Value, M::Error> {
         let (mut op, mut items, mut task, mut parent) = (None, None, None, None);
+        let (mut contract, mut start, mut evidence) = (None, None, None);
         while let Some(key) = map.next_key::<String>()? {
             match key.as_str() {
                 "op" => field(&mut map, &mut op, "op")?,
                 "items" => field(&mut map, &mut items, "items")?,
                 "task" => field(&mut map, &mut task, "task")?,
                 "parent" => field(&mut map, &mut parent, "parent")?,
+                "contract" => field(&mut map, &mut contract, "contract")?,
+                "start" => field(&mut map, &mut start, "start")?,
+                "evidence" => field(&mut map, &mut evidence, "evidence")?,
                 _ => {
                     return Err(de::Error::unknown_field(
                         &key,
-                        &["op", "items", "task", "parent"],
+                        &[
+                            "op", "items", "task", "parent", "contract", "start", "evidence",
+                        ],
                     ));
                 }
             }
@@ -140,6 +155,9 @@ impl<'de> Visitor<'de> for RequestVisitor {
             items: items.unwrap_or_default(),
             task: task.unwrap_or_default(),
             parent: parent.unwrap_or_default(),
+            contract: contract.unwrap_or_default(),
+            start: start.unwrap_or_default(),
+            evidence: evidence.unwrap_or_default(),
         })
     }
 }

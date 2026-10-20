@@ -22,6 +22,14 @@ export {
   widget,
 } from "./generated/todo_core.js";
 export type {
+  Acceptance,
+  Assignment,
+  ContractDraft,
+  Scope,
+  MutationContext,
+  Unit,
+  UnitContract,
+  UnitRef,
   Operation,
   ReminderFact,
   Request,

@@ -1,6 +1,6 @@
 import type { TodoList, WidgetRow } from "./wasm.ts";
-import { apply, init, widget } from "./wasm.ts";
 import { describe, expect, it, vi } from "vitest";
+import { init, parse, widget } from "./wasm.ts";
 import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 import { TodoWidget } from "./widget.ts";
 
@@ -35,8 +35,12 @@ const normalWidth = 80,
    * @returns {TodoList} Active snapshot.
    */
   started = (task: string, pending: readonly string[]): TodoList =>
-    apply(init([task, ...pending]), { items: undefined, op: "start", parent: undefined, task })
-      .list;
+    parse({
+      tasks: [
+        { content: task, status: "in_progress" },
+        ...pending.map((content) => ({ content, status: "pending" })),
+      ],
+    });
 
 describe("todo rendering", () => {
   it("renders active work and reveals grouped details only on expansion", { timeout: 5000 }, () => {

@@ -41,8 +41,14 @@ const emptyCount = 0,
       active = list.tasks.flatMap((task) => [
         ...(task.status === "in_progress" ? [task.content] : []),
         ...(task.subtasks ?? [])
-          .filter((child: Readonly<Subtask>) => child.status === "in_progress")
-          .map((child: Readonly<Subtask>) => `${task.content} → ${child.content}`),
+          .filter(
+            (child: Readonly<Pick<Subtask, "content" | "status">>) =>
+              child.status === "in_progress",
+          )
+          .map(
+            (child: Readonly<Pick<Subtask, "content" | "status">>) =>
+              `${task.content} → ${child.content}`,
+          ),
       ]),
       current =
         active.length > emptyCount
