@@ -14,6 +14,8 @@ wasm = ["dep:tsify", "dep:wasm-bindgen"]
 
 [dependencies]
 serde.workspace = true
+serde_json.workspace = true
+sha2 = "0.11.1"
 tsify = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 

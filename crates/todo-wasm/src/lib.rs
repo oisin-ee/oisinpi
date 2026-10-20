@@ -51,6 +51,78 @@ pub fn apply(
     Ok(todo_core::apply(list.to_rust()?, request, &context.to_rust()?)?.into_ts()?)
 }
 
+/// Reads a complete task contract.
+///
+/// # Errors
+/// Rejects unknown IDs or incomplete contracts.
+#[wasm_bindgen]
+pub fn inspect(list: &Ts<TodoList>, id: &str) -> Result<Ts<todo_core::UnitContract>, JsError> {
+    Ok(todo_core::inspect(&list.to_rust()?, id)?.into_ts()?)
+}
+
+/// Reads validated current-session activation.
+///
+/// # Errors
+/// Rejects invalid persisted state.
+#[wasm_bindgen]
+pub fn active(
+    list: &Ts<TodoList>,
+    session_id: &str,
+) -> Result<Option<Ts<todo_core::ActiveUnit>>, JsError> {
+    todo_core::active(&list.to_rust()?, session_id)?
+        .map(|value| value.into_ts().map_err(JsError::from))
+        .transpose()
+}
+
+/// Validates and atomically freezes a worker contract.
+///
+/// # Errors
+/// Rejects malformed requests, stale origins and competing claims.
+#[wasm_bindgen]
+pub fn claim(
+    list: &Ts<TodoList>,
+    input: &str,
+    session_id: &str,
+) -> Result<Ts<todo_core::ClaimChange>, JsError> {
+    let input = todo_core::parse_claim(input)?;
+    Ok(todo_core::claim(list.to_rust()?, &input, session_id)?.into_ts()?)
+}
+
+/// Records an executor's exact release evidence, never acceptance.
+///
+/// # Errors
+/// Rejects malformed or mismatched settlements.
+#[wasm_bindgen]
+pub fn settle(
+    list: &Ts<TodoList>,
+    input: &str,
+    session_id: &str,
+) -> Result<Ts<todo_core::SettlementChange>, JsError> {
+    let input = todo_core::parse_settlement(input)?;
+    Ok(todo_core::settle(list.to_rust()?, &input, session_id)?.into_ts()?)
+}
+
+/// Prevents mutations of revisions with an in-flight tool call.
+///
+/// # Errors
+/// Rejects closure, replacement or alteration of any leased revision.
+#[wasm_bindgen]
+pub fn protect(
+    before: &Ts<TodoList>,
+    after: &Ts<TodoList>,
+    leases: Vec<Ts<todo_core::UnitRef>>,
+) -> Result<(), JsError> {
+    let leases = leases
+        .into_iter()
+        .map(|lease| lease.to_rust())
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(todo_core::protect(
+        &before.to_rust()?,
+        &after.to_rust()?,
+        &leases,
+    )?)
+}
+
 /// Computes completion policy from branch facts.
 ///
 /// # Errors

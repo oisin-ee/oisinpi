@@ -176,10 +176,40 @@ fn concurrent_error(left: &Unit, right: &Unit) -> TodoError {
     })
 }
 
+fn held_binding(unit: &Unit, status: Status, leaf: bool) -> Result<(), TodoError> {
+    let Some(binding) = &unit.binding else {
+        return Ok(());
+    };
+    binding.execution.validate()?;
+    let exported = unit
+        .frozen_export_json
+        .as_deref()
+        .ok_or_else(|| error("BINDING_MISMATCH: missing frozen export"))?;
+    let exported = crate::TaskExport::parse(exported)?;
+    if exported.contract != unit.contract(&exported.contract.title)?
+        || exported.digest != binding.export_digest
+        || unit.attempted_revision != Some(unit.reference.revision)
+    {
+        return Err(error(
+            "BINDING_MISMATCH: frozen export differs from held contract",
+        ));
+    }
+    if binding.contract != unit.reference
+        || status != Status::InProgress
+        || !leaf
+        || !matches!(unit.draft.assignment, Some(Assignment::Worker { .. }))
+        || unit.local_session_id.is_some()
+    {
+        return Err(error("BINDING_MISMATCH: invalid held contract"));
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_units(list: &TodoList) -> Result<(), TodoError> {
     let entries = units(list);
     let mut graph = HashMap::new();
     let mut active = None;
+    let mut held: Vec<&Unit> = vec![];
     for (unit, status, leaf) in &entries {
         nonempty(&unit.reference.unit_id)?;
         nonempty(&unit.reference.session_id)?;
@@ -191,6 +221,7 @@ pub(crate) fn validate_units(list: &TodoList) -> Result<(), TodoError> {
             return Err(error("INVALID_IDENTITY: duplicate ID or zero revision"));
         }
         draft(&unit.draft)?;
+        held_binding(unit, *status, *leaf)?;
         if let Some(session) = &unit.local_session_id {
             nonempty(session)?;
             if *status != Status::InProgress
@@ -207,6 +238,12 @@ pub(crate) fn validate_units(list: &TodoList) -> Result<(), TodoError> {
                 return Err(concurrent_error(previous, unit));
             }
             active = Some(*unit);
+        }
+        if unit.binding.is_some() || unit.local_session_id.is_some() {
+            if held.iter().any(|other| scope_conflict(other, unit)) {
+                return Err(error("SCOPE_CONFLICT: active ownership overlaps"));
+            }
+            held.push(unit);
         }
     }
     let mut done = HashSet::new();

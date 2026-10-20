@@ -18,6 +18,8 @@ describe("extension registration", () => {
       },
     ]);
     expect(registered.events).toStrictEqual([
+      "tool_call",
+      "tool_execution_end",
       "session_start",
       "session_shutdown",
       "session_tree",

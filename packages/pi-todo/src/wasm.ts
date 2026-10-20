@@ -14,7 +14,12 @@ initSync({
 });
 
 export {
+  active,
   apply,
+  claim,
+  inspect,
+  protect,
+  settle,
   completion_reminder as completionReminder,
   init,
   parse,
@@ -23,7 +28,16 @@ export {
 } from "./generated/todo_core.js";
 export type {
   Acceptance,
+  ActiveUnit,
   Assignment,
+  ClaimInput,
+  ClaimResult,
+  EvidenceRef,
+  ExecutionRef,
+  Settlement,
+  SettlementResult,
+  TaskBinding,
+  TaskExport,
   ContractDraft,
   Scope,
   MutationContext,

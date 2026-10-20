@@ -1,19 +1,34 @@
 //! Branch-local outcomes and bounded work units, addressed by exact content.
 
+mod binding;
 mod contract;
 #[cfg(test)]
 mod contract_tests;
 mod deserialization;
+mod export;
 mod operations;
+mod provider;
+#[cfg(test)]
+mod provider_tests;
 mod reminder;
 mod selection;
 mod validation;
 mod widget;
 
-pub use contract::{
-    Acceptance, Assignment, ContractDraft, MutationContext, Scope, Unit, UnitContract, UnitRef,
+pub use binding::{
+    AcceptedEvent, BoundResult, EvidenceRef, ExportData, Prerequisite, Settlement, TaskBinding,
+    TaskExport, UnstartedResult,
 };
+pub use contract::{
+    Acceptance, Assignment, ContractDraft, ExecutionRef, MutationContext, Scope, Unit,
+    UnitContract, UnitRef,
+};
+pub use export::export_digest;
 pub use operations::{Change, DraftItem, Item, LeafItem, Operation, Request, apply};
+pub use provider::{
+    ActiveUnit, ClaimChange, ClaimInput, ClaimResult, SettlementChange, SettlementResult, active,
+    claim, inspect, parse_claim, parse_settlement, protect, settle,
+};
 pub use reminder::{ReminderFact, ReminderHistory, completion_reminder};
 pub use widget::{WidgetKind, WidgetRow, widget};
 

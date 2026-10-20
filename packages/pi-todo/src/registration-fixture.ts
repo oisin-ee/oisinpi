@@ -2,6 +2,7 @@ import type {
   ExtensionAPI,
   ExtensionToolContext,
   ToolDefinition,
+  ToolInfo,
 } from "@earendil-works/pi-coding-agent";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import type { TSchema } from "typebox";
@@ -24,7 +25,7 @@ type TodoAPI = Readonly<
 >;
 interface Registered {
   readonly name: string;
-  readonly parameters: unknown;
+  readonly parameters: TSchema;
   readonly execute: (params: TodoParams, ctx: ExtensionToolContext) => Promise<unknown>;
 }
 
@@ -44,6 +45,24 @@ interface Registration {
 const silent = (): void => {
     /* Registration has no transport side effects. */
   },
+  /**
+   * Projects registered test tools to real ownership metadata.
+   * @param {readonly Registered[]} tools Captured definitions.
+   * @returns {ToolInfo[]} Runtime metadata.
+   */
+  metadata = (tools: readonly Registered[]): ToolInfo[] =>
+    tools.map((tool) => ({
+      description: "Registered test tool",
+      exposure: "direct",
+      name: tool.name,
+      parameters: tool.parameters,
+      sourceInfo: {
+        origin: "top-level",
+        path: new URL("index.ts", import.meta.url).pathname,
+        scope: "project",
+        source: "extension",
+      },
+    })),
   registration = (
     session: Readonly<Pick<SessionManager, "appendCustomEntry">> = SessionManager.inMemory(),
   ): Registration => {
@@ -60,7 +79,7 @@ const silent = (): void => {
           emit: silent,
           on: (): (() => void) => silent,
         },
-        getAllTools: () => [],
+        getAllTools: () => metadata(tools),
         on: (event): (() => void) => {
           events.push(event);
           return (): void => {

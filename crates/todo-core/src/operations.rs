@@ -323,7 +323,7 @@ fn update(list: &mut TodoList, request: &Request) -> Result<(), TodoError> {
         ));
     }
     let draft = request.contract.clone().ok_or(TodoError::InvalidRequest)?;
-    if unit.draft != draft {
+    if unit.draft != draft || unit.attempted_revision == Some(unit.reference.revision) {
         unit.draft = draft;
         unit.reference.revision = unit
             .reference
@@ -377,7 +377,11 @@ fn close_root(task: &mut Task, request: &Request) -> Result<(), TodoError> {
     close_leaf(&mut task.status, &mut task.unit, request)
 }
 
-fn completion(list: &mut TodoList, request: &Request) -> Result<(), TodoError> {
+fn completion(
+    list: &mut TodoList,
+    request: &Request,
+    context: &MutationContext,
+) -> Result<(), TodoError> {
     if !matches!(request.op, Operation::Done) {
         return Ok(());
     }
@@ -397,7 +401,9 @@ fn completion(list: &mut TodoList, request: &Request) -> Result<(), TodoError> {
         .as_ref()
         .ok_or_else(|| error("CONTRACT_INCOMPLETE: update legacy work before completion"))?;
     unit.contract(title)?;
-    if unit.local_session_id.is_none() {
+    if unit.local_session_id.as_deref() != Some(&context.session_id)
+        && !crate::provider::has_review_evidence(unit)
+    {
         return Err(error(
             "ACCEPTANCE_REQUIRED: start local work or obtain released worker evidence before completion",
         ));
@@ -406,8 +412,12 @@ fn completion(list: &mut TodoList, request: &Request) -> Result<(), TodoError> {
     crate::validation::prerequisites(list, &unit)
 }
 
-fn close(list: &mut TodoList, request: &Request) -> Result<(), TodoError> {
-    completion(list, request)?;
+fn close(
+    list: &mut TodoList,
+    request: &Request,
+    context: &MutationContext,
+) -> Result<(), TodoError> {
+    completion(list, request, context)?;
     if let Some(selector) = &request.task {
         if request.parent.is_none()
             && list
@@ -457,6 +467,7 @@ pub fn apply(
     }
     nonempty(&context.session_id)?;
     nonempty(&context.mutation_id)?;
+    let previous = list.clone();
     migrate_request(&mut list, &mut request, context)?;
     let keys = match request.op {
         Operation::Init | Operation::Append => add(&mut list, &request, context)?,
@@ -469,7 +480,7 @@ pub fn apply(
             HashMap::new()
         }
         Operation::Done | Operation::Drop => {
-            close(&mut list, &request)?;
+            close(&mut list, &request, context)?;
             HashMap::new()
         }
         Operation::View => HashMap::new(),
@@ -480,6 +491,12 @@ pub fn apply(
         request.parent = None;
         start(&mut list, &request, context)?;
     }
+    let held = crate::validation::units(&previous)
+        .into_iter()
+        .filter(|(unit, _, _)| unit.binding.is_some())
+        .map(|(unit, _, _)| unit.reference.clone())
+        .collect::<Vec<_>>();
+    crate::provider::protect(&previous, &list, &held)?;
     validate(&list)?;
     Ok(Change {
         list,

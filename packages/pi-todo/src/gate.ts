@@ -1,0 +1,73 @@
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { TaskProvider } from "./provider.ts";
+import { ownsTodo } from "./lifecycle.ts";
+
+/** Exact structured reads and workflow controls, never command-text inference. */
+const controls = new Set([
+    "ask",
+    "codemode",
+    "interview",
+    "todo",
+    "tool_search",
+    "read",
+    "ls",
+    "find",
+    "grep",
+    "hypa_read",
+    "hypa_ls",
+    "hypa_find",
+    "hypa_grep",
+    "web_search",
+    "web_fetch",
+    "lsp_diagnostics",
+    "hindsight_search_knowledge_pages",
+    "hindsight_list_knowledge_pages",
+    "hindsight_read_knowledge_page",
+    "hindsight_reflect",
+    "hindsight_sync_status",
+    "hindsight_diagnose",
+    "hindsight_capture_initiative",
+    "mcp__dogsled__spawn",
+    "mcp__dogsled__send",
+    "mcp__dogsled__cancel",
+    "mcp__dogsled__close",
+    "mcp__dogsled__stop",
+    "mcp__dogsled__read",
+    "mcp__dogsled__status",
+    "mcp__dogsled__inbox",
+  ]),
+  /**
+   * Checks actual calls and leases execution-bearing calls.
+   * @param {Readonly<ExtensionAPI>} pi Runtime hooks and metadata.
+   * @param {Readonly<TaskProvider>} provider Task state and leases.
+   */
+  registerGate = (
+    pi: Readonly<Pick<ExtensionAPI, "on" | "getAllTools">>,
+    provider: Readonly<TaskProvider>,
+  ): void => {
+    pi.on("tool_call", (event: Readonly<{ toolName: string; toolCallId: string }>, ctx) => {
+      if (!ownsTodo(pi)) {
+        return { block: false };
+      }
+      provider.context(ctx);
+      if (controls.has(event.toolName)) {
+        return { block: false };
+      }
+      const active = provider.capability().active();
+      if (!active.ok || active.value === null) {
+        return {
+          block: true,
+          reason: active.ok
+            ? "Start a complete self-assigned leaf with todo before shell, code, mutation, or unknown tools."
+            : active.error.message,
+        };
+      }
+      provider.lease(event.toolCallId, active.value.ref);
+      return { block: false };
+    });
+    pi.on("tool_execution_end", (event: Readonly<{ toolCallId: string }>) => {
+      provider.release(event.toolCallId);
+    });
+  };
+
+export { registerGate };

@@ -1,11 +1,12 @@
 import { ownsTodo, settle } from "./lifecycle.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { PlannotatorHandoff } from "./plannotator.ts";
+import { TaskProvider } from "./provider.ts";
 import { TodoPresentation } from "./presentation.ts";
 import { TodoWork } from "./work.ts";
 import type { WorkHost } from "./work.ts";
 import { parameters } from "./schema.ts";
-import { runTodo } from "./tool.ts";
+import { registerGate } from "./gate.ts";
 import { workUnitGuidance } from "./guidance.ts";
 
 type TodoAPI = WorkHost &
@@ -29,18 +30,15 @@ type TodoAPI = WorkHost &
 export default function piTodo(pi: TodoAPI): void {
   const handoff = new PlannotatorHandoff(pi),
     presentation = new TodoPresentation(),
-    work = new TodoWork(pi, presentation);
+    work = new TodoWork(pi, presentation),
+    provider = new TaskProvider(pi);
   work.register(pi);
+  provider.register();
+  registerGate(pi, provider);
   pi.registerTool({
     description: `Keep branch-local outcomes and executable contracts. Use returned IDs, not labels. Draft creation is pending. Start one complete self-assigned leaf; workers require their assigned profile through the executor. Update replaces pending contract fields. Done requires acceptance evidence. Parents require explicit integration review after children close. ${workUnitGuidance}`,
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const result = runTodo(params, {
-        append: (customType, list) => {
-          pi.appendEntry(customType, list);
-        },
-        branch: () => ctx.sessionManager.getBranch(),
-        sessionId: ctx.sessionManager.getSessionId(),
-      });
+      const result = provider.run(params, ctx);
       work.publish(ctx);
       presentation.refresh(ctx);
       return result;
@@ -51,15 +49,18 @@ export default function piTodo(pi: TodoAPI): void {
     parameters,
   });
   pi.on("session_start", (_event, ctx) => {
+    provider.context(ctx);
     presentation.start(pi, ctx);
     work.start(ctx);
     handoff.start(ctx);
   });
   pi.on("session_shutdown", () => {
+    provider.stop();
     handoff.stop();
     work.stop();
   });
   pi.on("session_tree", (_event, ctx) => {
+    provider.context(ctx);
     if (ownsTodo(pi)) {
       work.publish(ctx);
       presentation.reset(ctx);

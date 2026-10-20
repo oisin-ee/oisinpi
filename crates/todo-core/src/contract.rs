@@ -83,6 +83,28 @@ pub struct UnitContract {
     pub assignment: Assignment,
 }
 
+/// Opaque executor identity; no process interpretation belongs here.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ExecutionRef {
+    pub executor: String,
+    pub owner_id: String,
+    pub request_id: String,
+}
+
+impl ExecutionRef {
+    pub(crate) fn validate(&self) -> Result<(), crate::TodoError> {
+        if self.executor != "dogsled" {
+            return Err(crate::validation::error(
+                "BINDING_MISMATCH: unsupported executor",
+            ));
+        }
+        crate::validation::nonempty(&self.owner_id)?;
+        crate::validation::nonempty(&self.request_id)
+    }
+}
+
 /// Stored task metadata, independent of process execution state.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
@@ -94,6 +116,17 @@ pub struct Unit {
     pub local_session_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub acceptance_evidence: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub binding: Option<crate::TaskBinding>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frozen_export_json: Option<String>,
+    #[serde(default)]
+    pub evidence: Vec<crate::EvidenceRef>,
+    #[serde(default)]
+    pub accepted_events: Vec<crate::AcceptedEvent>,
+    /// The last claimed revision cannot launch again after settlement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attempted_revision: Option<u32>,
 }
 
 /// Trusted runtime identity, separate from agent-authored tool parameters.
@@ -145,6 +178,11 @@ impl Unit {
             draft,
             local_session_id: None,
             acceptance_evidence: None,
+            binding: None,
+            frozen_export_json: None,
+            evidence: vec![],
+            accepted_events: vec![],
+            attempted_revision: None,
         }
     }
 
