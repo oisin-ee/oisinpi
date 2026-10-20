@@ -258,15 +258,22 @@ type TaskExport = {
   digest: string; // SHA-256 of canonical exported data, excluding digest
 };
 
-type Settlement = {
-  version: 1;
-  eventId: string;
-  binding: TaskBinding;
-  result:
-    | { kind: "returned"; evidence: EvidenceRef }
-    | { kind: "not_started"; reason: string }
-    | { kind: "stopped"; evidence?: EvidenceRef; reason: string };
-};
+type Settlement =
+  | {
+      version: 1;
+      eventId: string;
+      binding: TaskBinding;
+      result:
+        | { kind: "returned"; evidence: EvidenceRef }
+        | { kind: "stopped"; evidence?: EvidenceRef; reason: string };
+    }
+  | {
+      version: 1;
+      eventId: string;
+      origin: UnitRef;
+      execution: ExecutionRef;
+      result: { kind: "not_started"; reason: string };
+    };
 
 interface TaskProviderV1 {
   inspect(unitId: string): Result<UnitContract>;
@@ -460,6 +467,8 @@ Dogsled attaches deterministic `eventId` and `resultId` values from its records.
 Before abandoning a prepared request, Dogsled serializes that action with `commitUnit`. Abandonment records a permanent terminal marker; a later commit of that ID fails `REQUEST_CONFLICT`. It cannot release a task while a concurrent commit starts a worker. Background reconciliation does not abandon a currently executing spawn invocation. Record the originating tool-call/session identity in the request and use confirmed invocation completion or session replacement; uncertainty retains the prepared request. No TTL proves it abandoned.
 
 A prepared request without a task claim can be abandoned without a provider write. A held claim receives `not_started`. If its origin branch is inactive, Dogsled retains the settlement until that branch returns. No time-based assumption proves a worker absent.
+
+Implementation correction: a prepared request knows the origin and execution ID, but not the export digest before commit. Therefore `not_started` carries `origin` and `execution`, not a fabricated `TaskBinding`. The provider matches the exact execution, origin revision, and contract entry before releasing a hold. No matching claim on the correct origin is an idempotent no-op; another origin returns `STALE_ORIGIN`. Returned/stopped settlements retain full binding/digest checks. This fixes the claim-before-commit crash path without another state store or metadata round trip.
 
 #### 9. Errors and compatibility
 
