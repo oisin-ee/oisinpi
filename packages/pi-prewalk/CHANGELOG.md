@@ -1,5 +1,13 @@
 # @oisin-ee/pi-prewalk
 
+## 0.8.0
+
+### Minor Changes
+
+- [`50877ec`](https://github.com/oisin-ee/oisinpi/commit/50877ec0f9bba71b7f70d8bf8d3754191ac73364) Thanks [@oisincoveney](https://github.com/oisincoveney)! - Add executable task contracts, local activation gates, and profile-assigned worker handoff. Import exact worker contracts before their first task request. Attach returned evidence without accepting the lead task automatically.
+
+  Use the executor-owned seed-source capability with compatible Dogsled tooling. Require Pi 1.3.0 for the loaded startup guard. Prewalk recognizes validated activation and preserves its post-edit model switch.
+
 ## 0.7.2
 
 No changes in this release.
