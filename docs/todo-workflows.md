@@ -61,6 +61,8 @@ Executable completion requires a complete contract, completed prerequisites, pri
 
 Parents require closed children and explicit integration-review evidence. Closing children does not close their parent. Completed and dropped leaves cannot restart. Dropping a parent preserves completed children.
 
+Appending children to a completed or dropped root fails without changing its snapshot. New scope requires a new outcome.
+
 ## Scope and prerequisites
 
 Scope paths are repository-relative files or directory prefixes. Absolute paths, parent traversal, glob patterns, and duplicate paths are invalid. Empty ownership permits read-only work. Read paths do not claim ownership.

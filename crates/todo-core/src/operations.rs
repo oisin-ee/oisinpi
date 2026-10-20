@@ -246,6 +246,9 @@ fn add(
     let Created { tasks, keys } = create(items, context, offset)?;
     if let Some(parent) = &request.parent {
         let parent = root(list, parent)?;
+        if !parent.status.is_open() {
+            return Err(error("UNIT_CLOSED: create a new outcome for new scope"));
+        }
         if parent
             .unit
             .as_ref()
@@ -262,9 +265,6 @@ fn add(
                 status: task.status,
                 unit: task.unit,
             }));
-        if !parent.status.is_open() {
-            parent.status = Status::Pending;
-        }
     } else {
         list.tasks.extend(tasks);
     }
