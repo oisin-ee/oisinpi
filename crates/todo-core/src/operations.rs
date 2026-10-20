@@ -1,6 +1,12 @@
 //! Atomic operations over a branch snapshot.
-use crate::{Status, Subtask, Task, TodoError, TodoList, validate};
+use crate::selection::{Selected, matches, migrate_request, root, selected};
+use crate::validation::{error, nonempty};
+use crate::{
+    Assignment, ContractDraft, MutationContext, Status, Subtask, Task, TodoError, TodoList, Unit,
+    validate,
+};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Supported model-facing operations.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -13,6 +19,28 @@ pub enum Operation {
     Drop,
     Append,
     View,
+    Update,
+}
+
+/// A draft leaf; local keys are resolved only within its creation request.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
+#[serde(deny_unknown_fields)]
+pub struct DraftItem {
+    pub content: String,
+    #[serde(default)]
+    pub key: Option<String>,
+    #[serde(default)]
+    pub contract: ContractDraft,
+}
+
+/// Child creation never accepts another outcome.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
+#[serde(untagged, deny_unknown_fields)]
+pub enum LeafItem {
+    Text(String),
+    Draft(Box<DraftItem>),
 }
 
 /// Root creation accepts standalone outcomes or outcomes with leaf work units.
@@ -23,12 +51,12 @@ pub enum Item {
     Text(String),
     Outcome {
         content: String,
-        #[cfg_attr(feature = "wasm", tsify(type = "readonly string[]"))]
-        subtasks: Vec<String>,
+        subtasks: Vec<LeafItem>,
     },
+    Draft(Box<DraftItem>),
 }
 
-/// Exact task content, scoped by an optional root parent.
+/// IDs address migrated tasks; exact labels address only legacy records.
 #[derive(Clone, Debug, Serialize)]
 #[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
 #[serde(deny_unknown_fields)]
@@ -43,6 +71,12 @@ pub struct Request {
     pub task: Option<String>,
     #[cfg_attr(feature = "wasm", tsify(optional, type = "string | undefined"))]
     pub parent: Option<String>,
+    #[cfg_attr(feature = "wasm", tsify(optional, type = "ContractDraft | undefined"))]
+    pub contract: Option<ContractDraft>,
+    #[cfg_attr(feature = "wasm", tsify(optional, type = "string | undefined"))]
+    pub start: Option<String>,
+    #[cfg_attr(feature = "wasm", tsify(optional, type = "string | undefined"))]
+    pub evidence: Option<String>,
 }
 
 /// A successful operation; views never persist a snapshot.
@@ -53,31 +87,21 @@ pub struct Change {
     pub persist: bool,
 }
 
-pub(crate) fn create(items: Vec<Item>) -> Result<TodoList, TodoError> {
+pub(crate) fn legacy(items: Vec<String>) -> Result<TodoList, TodoError> {
     if items.is_empty() {
         return Err(TodoError::MissingItems);
     }
-    let tasks = items
-        .into_iter()
-        .map(|item| {
-            let (content, children) = match item {
-                Item::Text(content) => (content, vec![]),
-                Item::Outcome { content, subtasks } => (content, subtasks),
-            };
-            Task {
+    let list = TodoList {
+        tasks: items
+            .into_iter()
+            .map(|content| Task {
                 content: content.trim().to_owned(),
                 status: Status::Pending,
-                subtasks: children
-                    .into_iter()
-                    .map(|content| Subtask {
-                        content: content.trim().to_owned(),
-                        status: Status::Pending,
-                    })
-                    .collect(),
-            }
-        })
-        .collect();
-    let list = TodoList { tasks };
+                subtasks: vec![],
+                unit: None,
+            })
+            .collect(),
+    };
     validate(&list)?;
     Ok(list)
 }
@@ -86,324 +110,379 @@ const fn arguments(request: &Request) -> Result<(), TodoError> {
     let invalid = match request.op {
         Operation::Init => request.parent.is_some() || request.task.is_some(),
         Operation::Append => request.task.is_some(),
-        Operation::Start => request.items.is_some() || request.task.is_none(),
+        Operation::Start => {
+            request.items.is_some() || request.task.is_none() || request.start.is_some()
+        }
+        Operation::Update => {
+            request.items.is_some() || request.task.is_none() || request.contract.is_none()
+        }
         Operation::Done | Operation::Drop => {
-            request.items.is_some() || (request.parent.is_some() && request.task.is_none())
+            request.items.is_some()
+                || request.start.is_some()
+                || matches!((&request.parent, &request.task), (Some(_), None))
         }
         Operation::View => {
-            request.items.is_some() || request.task.is_some() || request.parent.is_some()
+            request.items.is_some()
+                || request.task.is_some()
+                || request.parent.is_some()
+                || request.start.is_some()
         }
     };
-    if invalid {
+    if invalid
+        || (request.contract.is_some() && !matches!(request.op, Operation::Update))
+        || (request.evidence.is_some() && !matches!(request.op, Operation::Done))
+    {
         Err(TodoError::InvalidRequest)
     } else {
         Ok(())
     }
 }
 
-fn root<'a>(list: &'a mut TodoList, content: &str) -> Result<&'a mut Task, TodoError> {
-    list.tasks
-        .iter_mut()
-        .find(|task| task.content == content)
-        .ok_or_else(|| TodoError::TaskNotFound(content.to_owned()))
+fn draft_item(
+    item: LeafItem,
+    runtime: &MutationContext,
+    index: usize,
+    keys: &mut HashMap<String, String>,
+) -> Result<Subtask, TodoError> {
+    let (content, draft, key) = match item {
+        LeafItem::Text(content) => (content, ContractDraft::default(), None),
+        LeafItem::Draft(item) => (item.content, item.contract, item.key),
+    };
+    let unit = Unit::new(runtime, index, draft);
+    if let Some(key) = key {
+        nonempty(&key)?;
+        if key.starts_with("u-") || keys.insert(key, unit.reference.unit_id.clone()).is_some() {
+            return Err(error(
+                "DUPLICATE_KEY: creation keys must be unique and cannot start with u-",
+            ));
+        }
+    }
+    Ok(Subtask {
+        content: content.trim().to_owned(),
+        status: Status::Pending,
+        unit: Some(unit),
+    })
 }
 
-fn append(list: &mut TodoList, request: Request) -> Result<(), TodoError> {
-    let items = request.items.unwrap_or_default();
-    if let Some(parent) = request.parent {
-        if items.iter().any(|item| !matches!(item, Item::Text(_))) {
-            return Err(TodoError::InvalidRequest);
+struct Created {
+    tasks: Vec<Task>,
+    keys: HashMap<String, String>,
+}
+
+fn resolve_dependencies(unit: &mut Unit, keys: &HashMap<String, String>) {
+    for dependency in &mut unit.draft.depends_on {
+        if let Some(id) = keys.get(dependency) {
+            dependency.clone_from(id);
         }
-        let additions = create(items)?;
-        let target = root(list, &parent)?;
-        target
+    }
+}
+
+fn create(
+    items: Vec<Item>,
+    runtime: &MutationContext,
+    offset: usize,
+) -> Result<Created, TodoError> {
+    if items.is_empty() {
+        return Err(TodoError::MissingItems);
+    }
+    let mut keys = HashMap::new();
+    let mut tasks = Vec::new();
+    let mut index = offset;
+    for item in items {
+        let (item, subtasks) = match item {
+            Item::Text(content) => (LeafItem::Text(content), vec![]),
+            Item::Draft(draft) => (LeafItem::Draft(draft), vec![]),
+            Item::Outcome { content, subtasks } => (LeafItem::Text(content), subtasks),
+        };
+        let root = draft_item(item, runtime, index, &mut keys)?;
+        index += 1;
+        let mut children = Vec::new();
+        for child in subtasks {
+            children.push(draft_item(child, runtime, index, &mut keys)?);
+            index += 1;
+        }
+        tasks.push(Task {
+            content: root.content,
+            status: root.status,
+            unit: root.unit,
+            subtasks: children,
+        });
+    }
+    for task in &mut tasks {
+        for unit in task.unit.iter_mut().chain(
+            task.subtasks
+                .iter_mut()
+                .filter_map(|child| child.unit.as_mut()),
+        ) {
+            resolve_dependencies(unit, &keys);
+        }
+    }
+    Ok(Created { tasks, keys })
+}
+
+fn add(
+    list: &mut TodoList,
+    request: &Request,
+    context: &MutationContext,
+) -> Result<HashMap<String, String>, TodoError> {
+    if matches!(request.op, Operation::Init) {
+        if crate::validation::units(list)
+            .iter()
+            .any(|(unit, _, _)| unit.local_session_id.is_some())
+        {
+            return Err(error("LOCAL_UNIT_ACTIVE: close active work before init"));
+        }
+        list.tasks.clear();
+    }
+    let offset = list.tasks.iter().map(|task| 1 + task.subtasks.len()).sum();
+    let items = request.items.clone().unwrap_or_default();
+    if request.parent.is_some()
+        && items
+            .iter()
+            .any(|item| matches!(item, Item::Outcome { .. }))
+    {
+        return Err(TodoError::InvalidRequest);
+    }
+    let Created { tasks, keys } = create(items, context, offset)?;
+    if let Some(parent) = &request.parent {
+        let parent = root(list, parent)?;
+        if parent
+            .unit
+            .as_ref()
+            .is_some_and(|unit| unit.local_session_id.is_some())
+        {
+            return Err(error(
+                "LOCAL_UNIT_ACTIVE: cannot add children to executing work",
+            ));
+        }
+        parent
             .subtasks
-            .extend(additions.tasks.into_iter().map(|task| Subtask {
+            .extend(tasks.into_iter().map(|task| Subtask {
                 content: task.content,
                 status: task.status,
+                unit: task.unit,
             }));
-        if !target.status.is_open() {
-            target.status = Status::Pending;
+        if !parent.status.is_open() {
+            parent.status = Status::Pending;
         }
     } else {
-        list.tasks.extend(create(items)?.tasks);
+        list.tasks.extend(tasks);
+    }
+    Ok(keys)
+}
+
+fn start(
+    list: &mut TodoList,
+    request: &Request,
+    context: &MutationContext,
+) -> Result<(), TodoError> {
+    let Selected {
+        content: title,
+        status,
+        unit,
+        leaf,
+    } = selected(list, request)?;
+    if !leaf {
+        return Err(error("NOT_EXECUTABLE: a parent is not a work unit"));
+    }
+    if !status.is_open() {
+        return Err(error("UNIT_CLOSED: completed or dropped work cannot start"));
+    }
+    let unit = unit
+        .as_mut()
+        .ok_or_else(|| error("CONTRACT_INCOMPLETE: update legacy work before start"))?;
+    let contract = unit.contract(title)?;
+    if contract.assignment != Assignment::Self_ {
+        return Err(error(
+            "WRONG_ASSIGNMENT: start requires self; workers use the external executor",
+        ));
+    }
+    unit.local_session_id = Some(context.session_id.clone());
+    *status = Status::InProgress;
+    for task in &mut list.tasks {
+        if task.subtasks.iter().any(|child| {
+            child
+                .unit
+                .as_ref()
+                .is_some_and(|unit| unit.local_session_id.is_some())
+        }) {
+            task.status = Status::InProgress;
+        }
     }
     validate(list)
 }
 
-fn close(task: &mut Task, status: Status) -> Result<(), TodoError> {
-    if status == Status::Completed && task.subtasks.iter().any(|child| child.status.is_open()) {
+fn update(list: &mut TodoList, request: &Request) -> Result<(), TodoError> {
+    let Selected { status, unit, .. } = selected(list, request)?;
+    let unit = unit
+        .as_mut()
+        .ok_or_else(|| error("INVALID_IDENTITY: migration required"))?;
+    if !status.is_open() || unit.local_session_id.is_some() {
+        return Err(error(
+            "UNIT_FROZEN: only pending or non-executing legacy contracts can change",
+        ));
+    }
+    let draft = request.contract.clone().ok_or(TodoError::InvalidRequest)?;
+    if unit.draft != draft {
+        unit.draft = draft;
+        unit.reference.revision = unit
+            .reference
+            .revision
+            .checked_add(1)
+            .ok_or_else(|| error("REVISION_EXHAUSTED"))?;
+        unit.reference.contract_entry_id.clear();
+        unit.acceptance_evidence = None;
+    }
+    Ok(())
+}
+
+fn close_leaf(
+    status: &mut Status,
+    unit: &mut Option<Unit>,
+    request: &Request,
+) -> Result<(), TodoError> {
+    if !status.is_open() {
+        return Ok(());
+    }
+    if matches!(request.op, Operation::Done) {
+        let evidence = request
+            .evidence
+            .as_ref()
+            .ok_or_else(|| error("ACCEPTANCE_REQUIRED: done needs concrete acceptance evidence"))?;
+        nonempty(evidence)?;
+        if let Some(unit) = unit {
+            unit.acceptance_evidence = Some(evidence.clone());
+        }
+        *status = Status::Completed;
+    } else {
+        *status = Status::Abandoned;
+    }
+    if let Some(unit) = unit {
+        unit.local_session_id = None;
+    }
+    Ok(())
+}
+
+fn close_root(task: &mut Task, request: &Request) -> Result<(), TodoError> {
+    if matches!(request.op, Operation::Done)
+        && task.subtasks.iter().any(|child| child.status.is_open())
+    {
         return Err(TodoError::OpenChildren(task.content.clone()));
     }
-    if status == Status::Abandoned {
+    if matches!(request.op, Operation::Drop) {
         for child in &mut task.subtasks {
-            if child.status.is_open() {
-                child.status = status;
-            }
+            close_leaf(&mut child.status, &mut child.unit, request)?;
         }
     }
-    task.status = status;
-    Ok(())
+    close_leaf(&mut task.status, &mut task.unit, request)
 }
 
-fn target(list: &mut TodoList, request: &Request, status: Status) -> Result<(), TodoError> {
-    let content = request.task.as_ref().ok_or(TodoError::MissingTask)?;
-    if let Some(parent) = &request.parent {
-        let task = root(list, parent)?;
-        let child = task
-            .subtasks
-            .iter_mut()
-            .find(|child| child.content == *content)
-            .ok_or_else(|| TodoError::TaskNotFound(content.clone()))?;
-        child.status = status;
-        if status == Status::InProgress {
-            task.status = Status::InProgress;
+fn completion(list: &mut TodoList, request: &Request) -> Result<(), TodoError> {
+    if !matches!(request.op, Operation::Done) {
+        return Ok(());
+    }
+    if request.task.is_none() {
+        return Err(error("REVIEW_REQUIRED: done requires an explicit unit ID"));
+    }
+    let Selected {
+        content: title,
+        status,
+        unit,
+        leaf,
+    } = selected(list, request)?;
+    if !status.is_open() || !leaf {
+        return Ok(());
+    }
+    let unit = unit
+        .as_ref()
+        .ok_or_else(|| error("CONTRACT_INCOMPLETE: update legacy work before completion"))?;
+    unit.contract(title)?;
+    if unit.local_session_id.is_none() {
+        return Err(error(
+            "ACCEPTANCE_REQUIRED: start local work or obtain released worker evidence before completion",
+        ));
+    }
+    let unit = unit.clone();
+    crate::validation::prerequisites(list, &unit)
+}
+
+fn close(list: &mut TodoList, request: &Request) -> Result<(), TodoError> {
+    completion(list, request)?;
+    if let Some(selector) = &request.task {
+        if request.parent.is_none()
+            && list
+                .tasks
+                .iter()
+                .any(|task| matches(&task.content, task.unit.as_ref(), selector))
+        {
+            close_root(root(list, selector)?, request)
+        } else {
+            let Selected { status, unit, .. } = selected(list, request)?;
+            close_leaf(status, unit, request)
         }
     } else {
-        let task = root(list, content)?;
-        if status == Status::InProgress {
-            task.status = status;
-        } else {
-            close(task, status)?;
+        if matches!(request.op, Operation::Done)
+            && list
+                .tasks
+                .iter()
+                .any(|task| task.status.is_open() && !task.subtasks.is_empty())
+        {
+            return Err(error(
+                "REVIEW_REQUIRED: complete each parent explicitly after integration review",
+            ));
         }
+        for task in list.tasks.iter_mut().filter(|task| task.status.is_open()) {
+            close_root(task, request)?;
+        }
+        Ok(())
     }
-    Ok(())
 }
 
-/// Applies a validated operation without changing its input on failure.
+/// Applies one atomic request using identity supplied by the trusted runtime.
 ///
 /// # Errors
-/// Rejects malformed requests, duplicate siblings, unknown targets and premature parent completion.
-pub fn apply(mut list: TodoList, request: Request) -> Result<Change, TodoError> {
+/// Rejects invalid contracts, transitions, prerequisites, or selectors without partial mutation.
+pub fn apply(
+    mut list: TodoList,
+    mut request: Request,
+    context: &MutationContext,
+) -> Result<Change, TodoError> {
     validate(&list)?;
     arguments(&request)?;
-    let persist = !matches!(request.op, Operation::View);
-    match request.op {
-        Operation::Init => list = create(request.items.unwrap_or_default())?,
-        Operation::Append => append(&mut list, request)?,
-        Operation::View => {}
-        Operation::Start => target(&mut list, &request, Status::InProgress)?,
+    if matches!(request.op, Operation::View) {
+        return Ok(Change {
+            list,
+            persist: false,
+        });
+    }
+    nonempty(&context.session_id)?;
+    nonempty(&context.mutation_id)?;
+    migrate_request(&mut list, &mut request, context)?;
+    let keys = match request.op {
+        Operation::Init | Operation::Append => add(&mut list, &request, context)?,
+        Operation::Update => {
+            update(&mut list, &request)?;
+            HashMap::new()
+        }
+        Operation::Start => {
+            start(&mut list, &request, context)?;
+            HashMap::new()
+        }
         Operation::Done | Operation::Drop => {
-            let status = if matches!(request.op, Operation::Done) {
-                Status::Completed
-            } else {
-                Status::Abandoned
-            };
-            if request.task.is_some() {
-                target(&mut list, &request, status)?;
-            } else {
-                for task in list.tasks.iter_mut().filter(|task| task.status.is_open()) {
-                    close(task, status)?;
-                }
-            }
+            close(&mut list, &request)?;
+            HashMap::new()
         }
+        Operation::View => HashMap::new(),
+    };
+    if let Some(selector) = &request.start {
+        let selector = keys.get(selector).unwrap_or(selector).clone();
+        request.task = Some(selector);
+        request.parent = None;
+        start(&mut list, &request, context)?;
     }
-    Ok(Change { list, persist })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn request(
-        op: Operation,
-        parent: Option<&str>,
-        task: Option<&str>,
-        items: Option<Vec<Item>>,
-    ) -> Request {
-        Request {
-            op,
-            parent: parent.map(str::to_owned),
-            task: task.map(str::to_owned),
-            items,
-        }
-    }
-    fn list() -> TodoList {
-        create(vec![
-            Item::Outcome {
-                content: "Outcome".to_owned(),
-                subtasks: vec!["Build".to_owned(), "Verify".to_owned()],
-            },
-            Item::Text("Other".to_owned()),
-        ])
-        .unwrap()
-    }
-    fn run(list: TodoList, request: Request) -> TodoList {
-        apply(list, request).unwrap().list
-    }
-
-    #[test]
-    fn explicit_starts_preserve_parallel_work_and_require_parent_review() {
-        let list = run(
-            list(),
-            request(Operation::Start, Some("Outcome"), Some("Build"), None),
-        );
-        let list = run(
-            list,
-            request(Operation::Start, Some("Outcome"), Some("Verify"), None),
-        );
-        assert!(
-            list.tasks[0]
-                .subtasks
-                .iter()
-                .all(|child| child.status == Status::InProgress),
-            "parallel starts"
-        );
-        assert!(
-            apply(
-                list.clone(),
-                request(Operation::Done, None, Some("Outcome"), None)
-            )
-            .is_err(),
-            "parent blocked"
-        );
-        assert!(
-            apply(list.clone(), request(Operation::Done, None, None, None)).is_err(),
-            "bulk completion blocked"
-        );
-        let list = run(
-            list,
-            request(Operation::Done, Some("Outcome"), Some("Build"), None),
-        );
-        let list = run(
-            list,
-            request(Operation::Drop, Some("Outcome"), Some("Verify"), None),
-        );
-        assert!(
-            list.tasks[0].ready_for_review(),
-            "explicit integration review remains"
-        );
-        assert!(
-            crate::view(&list).contains("1/2 subtasks completed"),
-            "abandoned not completed"
-        );
-        let list = run(list, request(Operation::Done, None, Some("Outcome"), None));
-        assert_eq!(
-            list.tasks[0].status,
-            Status::Completed,
-            "explicit completion"
-        );
-        assert_eq!(
-            list.tasks[1].status,
-            Status::Pending,
-            "no automatic activation"
-        );
-    }
-
-    #[test]
-    fn drop_preserves_completed_children_and_append_reopens_parent() {
-        let list = run(
-            list(),
-            request(Operation::Done, Some("Outcome"), Some("Build"), None),
-        );
-        let list = run(list, request(Operation::Drop, None, Some("Outcome"), None));
-        assert_eq!(
-            list.tasks[0].subtasks[0].status,
-            Status::Completed,
-            "completed preserved"
-        );
-        assert_eq!(
-            list.tasks[0].subtasks[1].status,
-            Status::Abandoned,
-            "open abandoned"
-        );
-        let list = run(
-            list,
-            request(
-                Operation::Append,
-                Some("Outcome"),
-                None,
-                Some(vec![Item::Text("Integrate".to_owned())]),
-            ),
-        );
-        assert_eq!(
-            list.tasks[0].status,
-            Status::Pending,
-            "closed parent reopens pending"
-        );
-        let list = run(
-            list,
-            request(Operation::Start, Some("Outcome"), Some("Build"), None),
-        );
-        assert_eq!(
-            list.tasks[0].status,
-            Status::InProgress,
-            "child start opens parent"
-        );
-    }
-
-    #[test]
-    fn exact_scoping_and_atomic_rejections() {
-        for value in [
-            request(
-                Operation::Append,
-                Some("Outcome"),
-                None,
-                Some(vec![
-                    Item::Text("New".to_owned()),
-                    Item::Text("Build".to_owned()),
-                ]),
-            ),
-            request(
-                Operation::Append,
-                Some("missing"),
-                None,
-                Some(vec![Item::Text("New".to_owned())]),
-            ),
-            request(
-                Operation::Append,
-                Some("Outcome"),
-                None,
-                Some(vec![Item::Outcome {
-                    content: "Nested".to_owned(),
-                    subtasks: vec![],
-                }]),
-            ),
-            request(Operation::Start, None, Some("Build"), None),
-            request(Operation::Start, Some("Outcome"), Some(" Build "), None),
-            request(Operation::Done, Some("Outcome"), None, None),
-        ] {
-            let original = list();
-            assert!(
-                apply(original.clone(), value).is_err(),
-                "reject without input mutation"
-            );
-            assert_eq!(original, list(), "unchanged snapshot");
-        }
-        let list = run(
-            list(),
-            request(
-                Operation::Append,
-                None,
-                None,
-                Some(vec![Item::Outcome {
-                    content: "Another".to_owned(),
-                    subtasks: vec!["Build".to_owned()],
-                }]),
-            ),
-        );
-        assert_eq!(
-            list.tasks.len(),
-            3,
-            "same child label in different parents accepted"
-        );
-    }
-
-    #[test]
-    fn bulk_closure_changes_open_work_only() {
-        let list = run(list(), request(Operation::Done, None, Some("Other"), None));
-        let list = run(list, request(Operation::Drop, None, None, None));
-        assert_eq!(
-            list.tasks[1].status,
-            Status::Completed,
-            "closed outcome preserved"
-        );
-        assert!(
-            list.tasks[0]
-                .subtasks
-                .iter()
-                .all(|child| child.status == Status::Abandoned),
-            "open children abandoned"
-        );
-    }
+    validate(&list)?;
+    Ok(Change {
+        list,
+        persist: true,
+    })
 }

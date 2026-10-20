@@ -21,9 +21,9 @@ interface Fixture {
 }
 
 /**
- * Builds a fully typed pi boundary mock, with no SDK runtime import.
+ * Builds the Pi branch boundary fixture.
  * @param {boolean} collision Whether another extension owns todo.
- * @returns {Fixture} Branch and pi seams.
+ * @returns {Fixture} Branch and Pi seams.
  */
 const fixture = (collision = false): Fixture => {
     const branch: SessionEntry[] = [],
@@ -62,6 +62,7 @@ const fixture = (collision = false): Fixture => {
             });
           },
           branch: () => branch,
+          sessionId: "adapter-test",
         });
       },
       rewind: (): void => {
@@ -94,20 +95,20 @@ describe("branch replay", () => {
     expect(widget).toHaveBeenLastCalledWith(
       {
         tasks: [
-          { content: "a", status: "pending", subtasks: [] },
-          { content: "b", status: "pending", subtasks: [] },
+          expect.objectContaining({ content: "a", status: "pending", subtasks: [] }),
+          expect.objectContaining({ content: "b", status: "pending", subtasks: [] }),
         ],
       },
       false,
     );
     expect(test.ctx.ui.setWidget).toHaveBeenLastCalledWith("pi-todo", expect.any(Function));
-    test.mutate({ op: "done" });
+    test.mutate({ op: "drop" });
     replay(test.ctx);
     expect(widget).toHaveBeenLastCalledWith(
       {
         tasks: [
-          { content: "a", status: "completed", subtasks: [] },
-          { content: "b", status: "completed", subtasks: [] },
+          expect.objectContaining({ content: "a", status: "abandoned", subtasks: [] }),
+          expect.objectContaining({ content: "b", status: "abandoned", subtasks: [] }),
         ],
       },
       false,
@@ -119,16 +120,19 @@ describe("branch replay", () => {
     expect.hasAssertions();
     const test = fixture();
     test.mutate({ items: ["a"], op: "init" });
-    test.mutate({ op: "done" });
+    test.mutate({ op: "drop" });
     test.rewind();
     replay(test.ctx);
     show(test.ctx);
     expect(widget).toHaveBeenLastCalledWith(
-      { tasks: [{ content: "a", status: "pending", subtasks: [] }] },
+      { tasks: [expect.objectContaining({ content: "a", status: "pending", subtasks: [] })] },
       false,
     );
     expect(test.ctx.ui.setWidget).toHaveBeenLastCalledWith("pi-todo", expect.any(Function));
-    expect(test.ctx.ui.notify).toHaveBeenLastCalledWith("Todo list: 0/1 completed\n[ ] a", "info");
+    expect(test.ctx.ui.notify).toHaveBeenLastCalledWith(
+      expect.stringContaining("Todo list: 0/1 completed\n[ ] a"),
+      "info",
+    );
   });
 });
 
@@ -227,7 +231,9 @@ describe("progress guard", () => {
     remember(test);
     test.mutate({ op: "view" });
     expect(settle(test.host, test.event, test.ctx)).toStrictEqual({});
-    test.mutate({ items: ["a"], op: "init" });
+    for (const entry of test.branch.filter((stored) => stored.type === "custom")) {
+      test.append(Object.assign({}, entry, { id: "repeated-status" }));
+    }
     expect(settle(test.host, test.event, test.ctx)).toStrictEqual({});
   });
 
@@ -276,7 +282,7 @@ describe("nested-only todo", () => {
       expect(JSON.stringify(settle(test.host, test.event, test.ctx))).toContain("nested work");
       show(test.ctx);
       expect(test.ctx.ui.notify).toHaveBeenCalledExactlyOnceWith(
-        "Todo list: 0/1 completed\n[ ] nested work",
+        expect.stringContaining("Todo list: 0/1 completed\n[ ] nested work"),
         "info",
       );
     },

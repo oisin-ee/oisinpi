@@ -1,22 +1,17 @@
-import { STATE_ENTRY, latestSnapshot } from "./state.ts";
-import { apply, parse, view } from "./wasm.ts";
+import { STATE_ENTRY, branchSnapshot } from "./state.ts";
+import { apply, view } from "./wasm.ts";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
+import type { Static } from "typebox";
 import type { TodoList } from "./wasm.ts";
+import type { parameters } from "./schema.ts";
 import { workUnitGuidance } from "./guidance.ts";
 
 /** One `todo` call, as the schema in `index.ts` admits it. */
-interface TodoParams {
-  readonly op: "init" | "start" | "done" | "drop" | "append" | "view";
-  readonly items?: readonly (
-    | string
-    | { readonly content: string; readonly subtasks: readonly string[] }
-  )[];
-  readonly parent?: string;
-  readonly task?: string;
-}
+type TodoParams = Static<typeof parameters>;
 
 /** What a call reads from and writes to the session. */
 interface TodoSession {
+  readonly sessionId: string;
   readonly branch: () => readonly SessionEntry[];
   readonly append: (customType: string, list: TodoList) => void;
 }
@@ -47,12 +42,18 @@ const result = (list: TodoList, creation: boolean): TodoResult => ({
    * @returns {TodoResult} The result for the model and the renderer.
    */
   runTodo = (params: TodoParams, session: TodoSession): TodoResult => {
-    const current = parse(latestSnapshot(session.branch())),
-      { list, persist } = apply(current, params);
+    const current = branchSnapshot(session.branch()),
+      { list, persist } = apply(current, params, {
+        mutationId: crypto.randomUUID(),
+        sessionId: session.sessionId,
+      });
     if (persist) {
       session.append(STATE_ENTRY, list);
     }
-    return result(list, params.op === "init" || params.op === "append");
+    return result(
+      persist ? branchSnapshot(session.branch()) : list,
+      params.op === "init" || params.op === "append",
+    );
   };
 
 export { runTodo };

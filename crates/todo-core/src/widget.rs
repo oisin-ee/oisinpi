@@ -54,6 +54,12 @@ fn group(list: &TodoList, status: Status, expanded: bool, rows: &mut Vec<WidgetR
             kind,
             text: format!("{mark} {}{review}", task.content),
         });
+        if let Some(unit) = &task.unit {
+            rows.push(WidgetRow {
+                kind: WidgetKind::Summary,
+                text: format!("  {}", unit.summary()),
+            });
+        }
         rows.extend(
             task.subtasks
                 .iter()
@@ -67,7 +73,10 @@ fn group(list: &TodoList, status: Status, expanded: bool, rows: &mut Vec<WidgetR
                     };
                     WidgetRow {
                         kind,
-                        text: format!("  {mark} {}", child.content),
+                        text: child.unit.as_ref().map_or_else(
+                            || format!("  {mark} {}", child.content),
+                            |unit| format!("  {mark} {} · {}", child.content, unit.summary()),
+                        ),
                     }
                 }),
         );
@@ -115,6 +124,7 @@ mod tests {
                 content: content.to_owned(),
                 status,
                 subtasks: vec![],
+                unit: None,
             })
             .collect(),
         }
@@ -172,6 +182,7 @@ mod tests {
                 content: "Finished".to_owned(),
                 status: Status::Completed,
                 subtasks: vec![],
+                unit: None,
             }],
         };
         assert_eq!(

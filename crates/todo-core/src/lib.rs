@@ -1,11 +1,19 @@
 //! Branch-local outcomes and bounded work units, addressed by exact content.
 
+mod contract;
+#[cfg(test)]
+mod contract_tests;
 mod deserialization;
 mod operations;
 mod reminder;
+mod selection;
+mod validation;
 mod widget;
 
-pub use operations::{Change, Item, Operation, Request, apply};
+pub use contract::{
+    Acceptance, Assignment, ContractDraft, MutationContext, Scope, Unit, UnitContract, UnitRef,
+};
+pub use operations::{Change, DraftItem, Item, LeafItem, Operation, Request, apply};
 pub use reminder::{ReminderFact, ReminderHistory, completion_reminder};
 pub use widget::{WidgetKind, WidgetRow, widget};
 
@@ -37,6 +45,8 @@ impl Status {
 pub struct Subtask {
     pub content: String,
     pub status: Status,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unit: Option<Unit>,
 }
 
 /// An outcome, optionally divided into bounded work units.
@@ -48,6 +58,8 @@ pub struct Task {
     pub status: Status,
     #[serde(default)]
     pub subtasks: Vec<Subtask>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unit: Option<Unit>,
 }
 
 impl Task {
@@ -78,11 +90,13 @@ pub enum TodoError {
     TaskNotFound(String),
     OpenChildren(String),
     InvalidRequest,
+    Contract(String),
 }
 
 impl fmt::Display for TodoError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Contract(message) => f.write_str(message),
             Self::MissingItems => f.write_str("Missing items for init or append operation"),
             Self::EmptyTask => f.write_str("Missing task content"),
             Self::DuplicateTask(content) => write!(f, "Duplicate task \"{content}\" in list"),
@@ -114,7 +128,7 @@ pub fn validate(list: &TodoList) -> Result<(), TodoError> {
             return Err(TodoError::OpenChildren(task.content.clone()));
         }
     }
-    Ok(())
+    validation::validate_units(list)
 }
 
 fn validate_labels<'a>(labels: impl Iterator<Item = &'a str>) -> Result<(), TodoError> {
@@ -135,7 +149,7 @@ fn validate_labels<'a>(labels: impl Iterator<Item = &'a str>) -> Result<(), Todo
 /// # Errors
 /// Rejects empty lists, blank labels, and duplicates.
 pub fn init(items: Vec<String>) -> Result<TodoList, TodoError> {
-    operations::create(items.into_iter().map(Item::Text).collect())
+    operations::legacy(items)
 }
 
 const fn mark(status: Status) -> &'static str {
@@ -178,11 +192,15 @@ pub fn view(list: &TodoList) -> String {
             ""
         };
         lines.push(format!("{} {}{review}", mark(task.status), task.content));
-        lines.extend(
-            task.subtasks
-                .iter()
-                .map(|child| format!("  {} {}", mark(child.status), child.content)),
-        );
+        if let Some(unit) = &task.unit {
+            lines.push(format!("    {}", unit.summary()));
+        }
+        for child in &task.subtasks {
+            lines.push(format!("  {} {}", mark(child.status), child.content));
+            if let Some(unit) = &child.unit {
+                lines.push(format!("      {}", unit.summary()));
+            }
+        }
     }
     lines.join("\n")
 }

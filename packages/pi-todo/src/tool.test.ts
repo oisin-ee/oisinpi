@@ -1,163 +1,159 @@
+import { contract, first, firstId, fixture, second } from "./contract-fixture.ts";
 import { describe, expect, it } from "vitest";
-import { STATE_ENTRY } from "./state.ts";
-import type { SessionEntry } from "@earendil-works/pi-coding-agent";
-import type { TodoSession } from "./tool.ts";
+import { branchSnapshot } from "./state.ts";
 import { runTodo } from "./tool.ts";
-import { workUnitGuidance } from "./guidance.ts";
 
-interface Fake {
-  readonly entries: readonly SessionEntry[];
-  readonly session: TodoSession;
-}
-
-/**
- * A custom entry as pi's `appendEntry` stores it.
- * @param {unknown} data The entry data.
- * @returns {SessionEntry} The entry.
- */
-const entry = (data: unknown): SessionEntry => ({
-    customType: STATE_ENTRY,
-    data,
-    id: crypto.randomUUID(),
-    parentId: null,
-    timestamp: "2026-10-16T00:00:00.000Z",
-    type: "custom",
-  }),
-  /**
-   * A session over an in-memory branch that `append` extends, as pi does.
-   * @param {readonly unknown[]} snapshots Snapshots already on the branch.
-   * @returns {Fake} The session and a view of its branch.
-   */
-  fake = (snapshots: readonly unknown[]): Fake => {
-    const branch = snapshots.map((data) => entry(data));
-    return {
-      entries: branch,
-      session: {
-        append: (_customType, list) => {
-          branch.push(entry(list));
-        },
-        branch: () => branch,
-      },
-    };
-  },
-  summary = "Todo list: 0/2 completed\n[ ] Read\n[ ] Fix";
-
-describe("todo init", () => {
-  it("stores the list", { timeout: 5000 }, () => {
+describe("executable todo contracts", () => {
+  it("creates and starts atomically with stable runtime provenance", { timeout: 5000 }, () => {
     expect.hasAssertions();
-    const { entries, session } = fake([]);
-    expect(runTodo({ items: ["Read", "Fix"], op: "init" }, session).content).toStrictEqual([
-      { text: `${summary}\n\n${workUnitGuidance}`, type: "text" },
-    ]);
-    expect(entries).toMatchObject([
-      {
-        customType: STATE_ENTRY,
-        data: {
-          tasks: [
-            { content: "Read", status: "pending", subtasks: [] },
-            { content: "Fix", status: "pending", subtasks: [] },
-          ],
-        },
-      },
-    ]);
-  });
-
-  it("throws on a rejected list and stores nothing", { timeout: 5000 }, () => {
-    expect.hasAssertions();
-    const { entries, session } = fake([]);
-    expect(() => runTodo({ items: ["a", "a"], op: "init" }, session)).toThrow(
-      'Duplicate task "a" in list',
-    );
-    expect(entries).toStrictEqual([]);
-  });
-});
-
-describe("todo changes", () => {
-  it.each([
-    { op: "start", status: "in_progress", task: "Fix" },
-    { op: "done", status: "completed", task: "Fix" },
-    { op: "drop", status: "abandoned", task: "Fix" },
-  ] as const)("persists $op and its exact snapshot", { timeout: 5000 }, ({ op, status, task }) => {
-    expect.hasAssertions();
-    const { entries, session } = fake([
-        {
-          tasks: [
-            { content: "Read", status: "in_progress" },
-            { content: "Fix", status: "pending" },
-          ],
-        },
-      ]),
-      result = runTodo({ op, task }, session);
-    expect(result.details.tasks).toContainEqual({ content: task, status, subtasks: [] });
-    expect(entries.toReversed().find((stored) => stored.type === "custom")).toMatchObject({
-      data: result.details,
+    const test = fixture(),
+      list = test.call({
+        items: [{ content: "Build", contract: contract(), key: "build" }],
+        op: "init",
+        start: "build",
+      }),
+      id = firstId(list),
+      origin = test.entries.at(first)?.id;
+    expect(list.tasks.at(first)?.unit).toMatchObject({
+      localSessionId: "test-session",
+      reference: { contractEntryId: origin, revision: 1, sessionId: "test-session", unitId: id },
     });
-  });
-
-  it("appends atomically without activation", { timeout: 5000 }, () => {
-    expect.hasAssertions();
-    const { entries, session } = fake([{ tasks: [{ content: "Read", status: "completed" }] }]),
-      result = runTodo({ items: ["Fix"], op: "append" }, session);
-    expect(result.details.tasks).toContainEqual({
-      content: "Fix",
-      status: "pending",
-      subtasks: [],
-    });
-    expect(() => runTodo({ items: ["New", "Fix"], op: "append" }, session)).toThrow("Duplicate");
-    expect(entries).toMatchObject([{ customType: STATE_ENTRY }, { customType: STATE_ENTRY }]);
-  });
-});
-
-describe("hierarchical tool persistence", () => {
-  it("uses parent-scoped targets and never stores a rejected change", { timeout: 5000 }, () => {
-    expect.hasAssertions();
-    const { entries, session } = fake([]);
-    runTodo(
-      { items: [{ content: "Outcome", subtasks: ["Build", "Verify"] }], op: "init" },
-      session,
-    );
-    runTodo({ op: "start", parent: "Outcome", task: "Build" }, session);
-    const before = [...entries];
-    expect(() => runTodo({ op: "done", task: "Outcome" }, session)).toThrow("open subtasks");
-    expect(() =>
-      runTodo({ items: ["New", "Build"], op: "append", parent: "Outcome" }, session),
-    ).toThrow("Duplicate");
-    expect(() =>
-      runTodo(
-        { items: [{ content: "Nested", subtasks: [] }], op: "append", parent: "Outcome" },
-        session,
-      ),
-    ).toThrow("Invalid arguments");
-    expect(entries).toStrictEqual(before);
-    expect(runTodo({ op: "view" }, session).content).toStrictEqual([
+    expect(test.entries).toMatchObject([
       {
-        text: "Todo list: 0/1 completed outcomes; 0/2 subtasks completed\n[/] Outcome\n  [/] Build\n  [ ] Verify",
-        type: "text",
+        data: { tasks: [{ unit: { reference: { contractEntryId: "" } } }] },
       },
     ]);
+    test.call({ evidence: "moon passed", op: "done", task: id });
+    expect(branchSnapshot(test.entries).tasks.at(first)?.unit?.reference.contractEntryId).toBe(
+      origin,
+    );
+    expect(test.call({ op: "view" }).tasks.at(first)?.status).toBe("completed");
   });
 });
 
-describe("todo view", () => {
-  it("reads the latest list back from the branch", { timeout: 5000 }, () => {
+describe("closed revisions", () => {
+  it("does not reopen completed work", { timeout: 5000 }, () => {
     expect.hasAssertions();
-    const { session } = fake([{ tasks: [] }]);
-    runTodo({ items: ["Read", "Fix"], op: "init" }, session);
-    expect(runTodo({ op: "view" }, session).content).toStrictEqual([
-      { text: summary, type: "text" },
-    ]);
+    const test = fixture(),
+      id = firstId(
+        test.call({
+          items: [{ content: "Build", contract: contract(), key: "build" }],
+          op: "init",
+          start: "build",
+        }),
+      );
+    test.call({ evidence: "passed", op: "done", task: id });
+    expect(() => test.call({ op: "start", task: id })).toThrow("UNIT_CLOSED");
   });
 
-  it("shows an empty list for a branch with no list", { timeout: 5000 }, () => {
+  it(
+    "keeps failed mutations atomic and rejects label selectors after creation",
+    { timeout: 5000 },
+    () => {
+      expect.hasAssertions();
+      const test = fixture(),
+        id = firstId(test.call({ items: ["Build"], op: "init" })),
+        before = [...test.entries];
+      expect(() => test.call({ op: "start", task: id })).toThrow("CONTRACT_INCOMPLETE");
+      expect(() => test.call({ op: "drop", task: "Build" })).toThrow("not found");
+      expect(() => test.call({ items: ["a", "a"], op: "append" })).toThrow("Duplicate");
+      expect(test.entries).toStrictEqual(before);
+    },
+  );
+});
+
+describe("contract revisions", () => {
+  it("updates drafts with a new revision and freezes local work", { timeout: 5000 }, () => {
     expect.hasAssertions();
-    expect(runTodo({ op: "view" }, fake([]).session).content).toStrictEqual([
+    const test = fixture(),
+      id = firstId(test.call({ items: ["Build"], op: "init" }));
+    test.call({ contract: contract(), op: "update", task: id });
+    const revision = test.call({ op: "view" }).tasks.at(first)?.unit?.reference;
+    expect(revision).toMatchObject({
+      contractEntryId: test.entries.at(second)?.id,
+      revision: 2,
+      unitId: id,
+    });
+    expect(() => test.call({ evidence: "not started", op: "done", task: id })).toThrow(
+      "ACCEPTANCE_REQUIRED",
+    );
+    test.call({ op: "start", task: id });
+    expect(() => test.call({ op: "done", task: id })).toThrow("ACCEPTANCE_REQUIRED");
+    expect(
+      test.call({ evidence: "All assertions passed", op: "done", task: id }).tasks.at(first)?.unit,
+    ).toMatchObject({ acceptanceEvidence: "All assertions passed", reference: revision });
+  });
+
+  it("blocks contract mutation and replacement while active", { timeout: 5000 }, () => {
+    expect.hasAssertions();
+    const test = fixture(),
+      id = firstId(
+        test.call({
+          items: [{ content: "Build", contract: contract(), key: "build" }],
+          op: "init",
+          start: "build",
+        }),
+      );
+    expect(() => test.call({ contract: contract(), op: "update", task: id })).toThrow(
+      "UNIT_FROZEN",
+    );
+    expect(() => test.call({ items: ["Replacement"], op: "init" })).toThrow("LOCAL_UNIT_ACTIVE");
+  });
+});
+
+describe("branch-local migration", () => {
+  it("preserves legacy statuses and requires update then explicit start", { timeout: 5000 }, () => {
+    expect.hasAssertions();
+    const test = fixture([
+      {
+        tasks: [
+          { content: "Old active", status: "in_progress" },
+          { content: "Done", status: "completed" },
+        ],
+      },
+    ]);
+    expect(test.call({ op: "view" }).tasks.at(first)?.unit).toBeUndefined();
+    const list = test.call({ contract: contract(), op: "update", task: "Old active" }),
+      id = firstId(list);
+    expect(list.tasks.map((task) => task.status)).toStrictEqual(["in_progress", "completed"]);
+    expect(list.tasks.at(first)?.unit?.localSessionId).toBeUndefined();
+    expect(() => test.call({ evidence: "old string", op: "done", task: id })).toThrow(
+      "ACCEPTANCE_REQUIRED",
+    );
+    test.call({ op: "start", task: id });
+    test.call({ op: "drop", task: id });
+    expect(test.call({ op: "view" }).tasks.at(second)?.status).toBe("completed");
+  });
+});
+
+describe("branch provenance", () => {
+  it("reads branch provenance without circular append or global caches", { timeout: 5000 }, () => {
+    expect.hasAssertions();
+    const test = fixture(),
+      id = firstId(test.call({ items: ["Build"], op: "init" })),
+      originalEntry = test.entries.at(first)?.id;
+    test.call({ contract: contract(), op: "update", task: id });
+    const revisedEntry = test.entries.at(second)?.id;
+    expect(branchSnapshot(test.entries).tasks.at(first)?.unit?.reference.contractEntryId).toBe(
+      revisedEntry,
+    );
+    test.entries.pop();
+    expect(branchSnapshot(test.entries).tasks.at(first)?.unit?.reference.contractEntryId).toBe(
+      originalEntry,
+    );
+    test.call({ contract: contract(), op: "update", task: id });
+    expect(branchSnapshot(test.entries).tasks.at(first)?.unit?.reference.contractEntryId).not.toBe(
+      revisedEntry,
+    );
+  });
+
+  it("shows empty branches and rejects damaged snapshots", { timeout: 5000 }, () => {
+    expect.hasAssertions();
+    expect(runTodo({ op: "view" }, fixture().session).content).toStrictEqual([
       { text: "Todo list is empty.", type: "text" },
     ]);
-  });
-
-  it("throws on a damaged snapshot instead of rendering", { timeout: 5000 }, () => {
-    expect.hasAssertions();
-    const { session } = fake([{ tasks: [{ content: "a", status: "lost" }] }]);
-    expect(() => runTodo({ op: "view" }, session)).toThrow("unknown variant `lost`");
+    expect(() =>
+      fixture([{ tasks: [{ content: "a", status: "lost" }] }]).call({ op: "view" }),
+    ).toThrow("unknown variant");
   });
 });
