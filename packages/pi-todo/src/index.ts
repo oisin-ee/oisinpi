@@ -16,8 +16,6 @@ type TodoAPI = WorkHost &
       ExtensionAPI,
       | "appendEntry"
       | "getAllTools"
-      | "getFlag"
-      | "registerFlag"
       | "exec"
       | "on"
       | "registerCommand"
@@ -37,10 +35,6 @@ export default function piTodo(pi: TodoAPI): void {
     work = new TodoWork(pi, presentation),
     provider = new TaskProvider(pi),
     workerImport = new WorkerImport(pi, provider);
-  pi.registerFlag("todo-unit-file", {
-    description: "Executor-owned task seed for a fresh worker session",
-    type: "string",
-  });
   work.register(pi);
   provider.register();
   registerGate(pi, provider);

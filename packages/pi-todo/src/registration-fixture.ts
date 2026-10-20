@@ -16,8 +16,6 @@ type TodoAPI = Readonly<
     | "appendEntry"
     | "events"
     | "getAllTools"
-    | "getFlag"
-    | "registerFlag"
     | "exec"
     | "on"
     | "registerCommand"
@@ -99,7 +97,6 @@ const silent = (): void => {
           throw new Error("Unexpected startup execution");
         },
         getAllTools: () => metadata(tools),
-        getFlag: () => new Map<string, string>().get("todo-unit-file"),
         on: (event): (() => void) => {
           events.push(event);
           return silent;
@@ -107,7 +104,6 @@ const silent = (): void => {
         registerCommand: (name): void => {
           commands.push(name);
         },
-        registerFlag: silent,
         registerShortcut: (key): void => {
           shortcuts.push(key);
         },

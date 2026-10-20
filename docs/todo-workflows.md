@@ -95,6 +95,12 @@ This is trusted extension coordination, not operating-system isolation. Pi-todo 
 
 ## Worker startup and completion
 
+Dogsled alone registers `--todo-unit-file`. Pi scopes flag reads to the registering extension; duplicate registration prevents both extensions from loading.
+
+Pi-todo queries `oisin.tasks.seed-source.v1` during startup. Dogsled registers this synchronous listener during extension loading and returns `{version:1,path}`.
+The path is null for an ordinary launch. Missing sources do not import; malformed or multiple sources reject import. The loaded guard rejects missing acknowledgement.
+Pi-todo owns seed parsing and validation. This transport capability cannot dispatch, claim, or accept work.
+
 Dogsled supplies `--todo-unit-file` with `{version:1, execution, binding, exported}`. Pi-todo validates the digest, correlation, contract, and prerequisite evidence.
 The checkout origin must match `scope.repositoryId`: canonical lowercase host plus case-preserved repository path, without `.git`. SSH and HTTPS origins identify the same repository.
 A fresh worker imports one atomic snapshot and activates the exact contract without a model-authored todo call. Assignment remains `worker`; imported evidence replaces local prerequisite tasks.

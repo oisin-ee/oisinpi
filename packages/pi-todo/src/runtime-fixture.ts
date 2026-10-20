@@ -20,6 +20,7 @@ import type { TodoParams } from "./tool.ts";
 import { Type } from "typebox";
 import { contract } from "./contract-fixture.ts";
 import piTodo from "./index.ts";
+import { registerSeedSource } from "./seed-fixture.ts";
 
 type Session = Awaited<ReturnType<typeof createAgentSession>>["session"];
 interface Startup {
@@ -77,6 +78,9 @@ const resources = (
         noThemes: true,
         settingsManager: settings,
       });
+    if (startup !== undefined) {
+      registerSeedSource(events, { path: startup.seedPath, version: 1 });
+    }
     return { events, loader, manager, settings };
   },
   /**
@@ -174,9 +178,6 @@ const resources = (
       settingsManager: setup.settings,
       thinkingLevel: "off",
     });
-    if (startup !== undefined) {
-      session.extensionRunner.setFlagValue("todo-unit-file", startup.seedPath);
-    }
     await session.bindExtensions({});
     session.setActiveToolsByName([...session.getActiveToolNames(), "codemode"]);
     return {
