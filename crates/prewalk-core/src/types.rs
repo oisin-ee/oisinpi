@@ -167,6 +167,9 @@ pub struct Facts {
     pub default: Option<Selection>,
     /// Is todo callable (directly or through codemode)?
     pub todo: bool,
+    /// Current provider activation; absent preserves the legacy successful-todo rule.
+    #[serde(default)]
+    pub active_unit: Option<bool>,
     /// Todo source identity for status.
     pub todo_owner: String,
     /// The runtime event.

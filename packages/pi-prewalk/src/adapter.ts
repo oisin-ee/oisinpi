@@ -4,6 +4,7 @@ import type { BoundaryResult, SessionBoundaryDraft } from "@earendil-works/pi-co
 import type { Context, Files, Host } from "./ports.ts";
 import { branchRecords, calls } from "./branch.ts";
 import type { CallEvidence } from "./branch.ts";
+import { activeTask } from "./tasks.ts";
 import { decide } from "./wasm.ts";
 
 /**
@@ -117,6 +118,7 @@ class Adapter {
           todo.exposure === "deferred" ||
           this.#pi.getActiveTools().includes("todo"));
     return {
+      active_unit: activeTask(this.#pi.events),
       available: ctx.modelRegistry
         .getAvailable()
         .map((candidate) => `${candidate.provider}/${candidate.id}`),

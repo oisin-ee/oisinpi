@@ -2,7 +2,7 @@
 
 The `todo` tool stores branch-local outcomes and leaf contracts. Rust validates operations before Pi appends one snapshot. Failed operations append nothing.
 
-This unit implements contracts, local activation, acceptance, migration, and display. It does not gate other tools or launch workers. Provider handoff and worker import are separate units.
+Pi-todo implements contracts, local execution gates, provider handoff, worker import, acceptance, migration, and display. It does not launch workers.
 
 ## Create and start
 
@@ -16,7 +16,7 @@ This unit implements contracts, local activation, acceptance, migration, and dis
       "contract": {
         "deliverable": "Validated contracts through the todo tool",
         "scope": {
-          "repositoryId": "oisinpi",
+          "repositoryId": "github.com/oisin-ee/oisinpi",
           "owns": ["crates/todo-core/", "packages/pi-todo/src/"],
           "reads": ["plans/todo-workflows.md"],
           "generates": ["packages/pi-todo/src/generated/"]
@@ -57,7 +57,7 @@ An acceptance requirement can instead use `{kind:"review", artifact, criterion}`
 
 A locally active unit prevents replacement with `init`. Its contract cannot change. Another local leaf cannot start, even with disjoint ownership. A worker assignment uses `{kind:"worker", profile:"general"}`. `start` rejects worker assignments without launching anything.
 
-Executable completion requires a complete contract, completed prerequisites, prior local activation, and nonempty acceptance evidence. Worker acceptance requires the later provider integration. A worker exit does not establish acceptance.
+Executable completion requires a complete contract, completed prerequisites, prior local activation, and nonempty acceptance evidence. Worker acceptance requires released provider evidence. A worker exit does not establish acceptance.
 
 Parents require closed children and explicit integration-review evidence. Closing children does not close their parent. Completed and dropped leaves cannot restart. Dropping a parent preserves completed children.
 
@@ -80,7 +80,7 @@ Other guardrails retain their own blocking decisions.
 Extensions acquire the synchronous capability through `oisin.tasks.acquire.v1` with `{version: 1, reply}`.
 Only the winning `todo` owner responds. Consumers must reject multiple responses.
 Methods are `inspect`, `claim`, `settle`, `active`, and `imported`. They return `{ok, value}` or `{ok:false, error}`.
-The importer is a separate unit. Until it exists, `imported()` returns successful `null`, never an acknowledgement.
+`imported()` returns the validated worker receipt, including its immutable completion seal, or `null` for an ordinary session.
 
 Rust owns claim and settlement validation. A claim stores the binding and exact canonical export bytes in one branch snapshot.
 Same-execution replay returns the frozen export. Settlement stores accepted event identities across later revisions, so reordered duplicates cannot release a newer binding.
@@ -92,6 +92,22 @@ The digest is SHA-256 over compact UTF-8 JSON, excluding `digest`. Field order f
 The fixed brief contains title, deliverable, repository, owned/read/generated paths, acceptance, and origin.
 Shared test data comes unchanged from Dogsled `51059cb`, `tests/fixtures/unit-exports.json`.
 This is trusted extension coordination, not operating-system isolation. Pi-todo does not launch workers, query processes, resolve profiles, or poll.
+
+## Worker startup and completion
+
+Dogsled supplies `--todo-unit-file` with `{version:1, execution, binding, exported}`. Pi-todo validates the digest, correlation, contract, and prerequisite evidence.
+The checkout origin must match `scope.repositoryId`: canonical lowercase host plus case-preserved repository path, without `.git`. SSH and HTTPS origins identify the same repository.
+A fresh worker imports one atomic snapshot and activates the exact contract without a model-authored todo call. Assignment remains `worker`; imported evidence replaces local prerequisite tasks.
+Repeated startup uses the recorded branch, not the seed file. It never resets progress. Another repository, changed payload, or existing unseeded session rejects import.
+The worker cannot replace, reassign, expand, or reopen its contract. Normal `todo done` or `todo drop` records a seal in the closure snapshot.
+The provider exposes the seal entry ID and disposition. Branch rewinds cannot discard imported scope or reopen a sealed execution.
+This seal is not lead acceptance or an executor termination claim. Dogsled owns terminal correlation and settlement delivery.
+
+The loaded Dogsled startup guard must verify `imported()` before the initial task model request and abort on missing acknowledgement.
+This guarantee excludes resume-time compaction and sessions where both extensions fail to load. Import acknowledgement proves activation, not disk durability before Pi persists its first conversation message.
+
+Prewalk queries validated local activation. A seeded worker needs no synthetic todo call. The model switch still occurs after the first edit or write result.
+Without the provider capability, prewalk retains its successful-todo fallback.
 
 ## Identity and migration
 

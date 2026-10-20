@@ -359,6 +359,12 @@ fn close_leaf(
     }
     if let Some(unit) = unit {
         unit.local_session_id = None;
+        if let Some(imported) = &mut unit.imported {
+            imported.seal = Some(crate::Seal {
+                entry_id: String::new(),
+                disposition: *status,
+            });
+        }
     }
     Ok(())
 }
@@ -467,6 +473,18 @@ pub fn apply(
     }
     nonempty(&context.session_id)?;
     nonempty(&context.mutation_id)?;
+    if let Some(imported) = list
+        .tasks
+        .first()
+        .and_then(|task| task.unit.as_ref())
+        .and_then(|unit| unit.imported.as_ref())
+        && (!matches!(request.op, Operation::Done | Operation::Drop)
+            || imported.local_session_id != context.session_id)
+    {
+        return Err(error(
+            "SEEDED_SCOPE_LOCKED: only closure of the imported unit is allowed",
+        ));
+    }
     let previous = list.clone();
     migrate_request(&mut list, &mut request, context)?;
     let keys = match request.op {

@@ -22,6 +22,10 @@ import { contract } from "./contract-fixture.ts";
 import piTodo from "./index.ts";
 
 type Session = Awaited<ReturnType<typeof createAgentSession>>["session"];
+interface Startup {
+  readonly cwd: string;
+  readonly seedPath: string;
+}
 interface RuntimeFixture {
   readonly session: Readonly<Pick<Session, "dispose" | "abort" | "messages">> & {
     readonly extensionRunner: Readonly<Pick<Session["extensionRunner"], "emitToolResult" | "emit">>;
@@ -37,11 +41,13 @@ interface RuntimeFixture {
  * Creates resources without user configuration or external services.
  * @param {ExtensionFactory} later Optional additional guard or test tool.
  * @param {boolean} collision Whether the other todo owner loads first.
+ * @param {Startup | undefined} startup Optional worker startup configuration.
  * @returns {object} Local resource owners.
  */
 const resources = (
     later: ExtensionFactory | undefined,
     collision: boolean,
+    startup: Startup | undefined,
   ): {
     events: ReturnType<typeof createEventBus>;
     manager: SessionManager;
@@ -57,7 +63,7 @@ const resources = (
       loader = new DefaultResourceLoader({
         additionalExtensionPaths: collision ? [] : [new URL("index.ts", import.meta.url).pathname],
         agentDir: "/nonexistent/pi-todo-test",
-        cwd: "/tmp",
+        cwd: startup?.cwd ?? "/tmp",
         eventBus: events,
         extensionFactories: [
           createCodemodeExtension(),
@@ -120,13 +126,36 @@ const resources = (
     );
   },
   /**
+   * Executes a scripted tool request through the actual model runtime.
+   * @param {Session} session Session execution owner.
+   * @param {Readonly<ReturnType<typeof fauxProvider>>} faux Scripted provider.
+   * @returns {RuntimeFixture["call"]} Request function.
+   */
+  caller =
+    (
+      session: Readonly<Pick<Session, "prompt">>,
+      faux: Readonly<Pick<ReturnType<typeof fauxProvider>, "setResponses">>,
+    ): RuntimeFixture["call"] =>
+    async (name, args): Promise<void> => {
+      faux.setResponses([
+        fauxAssistantMessage(fauxToolCall(name, args)),
+        fauxAssistantMessage("Done."),
+      ]);
+      await session.prompt("Exercise one tool.");
+    },
+  /**
    * Loads the real runner and codemode with a scripted model.
    * @param {ExtensionFactory} later Additional extension.
    * @param {boolean} collision Loads a competing owner first.
+   * @param {Startup | undefined} startup Optional worker startup configuration.
    * @returns {Promise<RuntimeFixture>} Isolated runtime and callers.
    */
-  runtimeFixture = async (later?: ExtensionFactory, collision = false): Promise<RuntimeFixture> => {
-    const setup = resources(later, collision),
+  runtimeFixture = async (
+    later?: ExtensionFactory,
+    collision = false,
+    startup?: Startup,
+  ): Promise<RuntimeFixture> => {
+    const setup = resources(later, collision, startup),
       modelRuntime = await ModelRuntime.create({
         credentials: new InMemoryCredentialStore(),
         modelsPath: null,
@@ -137,7 +166,7 @@ const resources = (
     modelRuntime.registerNativeProvider(faux.provider);
     await setup.loader.reload();
     const { session } = await createAgentSession({
-      cwd: "/tmp",
+      cwd: startup?.cwd ?? "/tmp",
       model: faux.getModel(),
       modelRuntime,
       resourceLoader: setup.loader,
@@ -145,17 +174,13 @@ const resources = (
       settingsManager: setup.settings,
       thinkingLevel: "off",
     });
+    if (startup !== undefined) {
+      session.extensionRunner.setFlagValue("todo-unit-file", startup.seedPath);
+    }
     await session.bindExtensions({});
     session.setActiveToolsByName([...session.getActiveToolNames(), "codemode"]);
-    const call = async (name: string, args: Readonly<Record<string, string>>): Promise<void> => {
-      faux.setResponses([
-        fauxAssistantMessage(fauxToolCall(name, args)),
-        fauxAssistantMessage("Done."),
-      ]);
-      await session.prompt("Exercise one tool.");
-    };
     return {
-      call,
+      call: caller(session, faux),
       create: async (): Promise<void> => {
         await todoCall(session, {
           items: [{ content: "Build", contract: contract(), key: "build" }],

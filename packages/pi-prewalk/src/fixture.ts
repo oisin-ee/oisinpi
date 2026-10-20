@@ -4,6 +4,7 @@ import type { SessionBoundaryDraft, SessionEntry, ToolInfo } from "@earendil-wor
 import { Adapter } from "./adapter.ts";
 import { calls } from "./branch.ts";
 import { configure } from "./wasm.ts";
+import { createEventBus } from "@earendil-works/pi-coding-agent";
 
 /** Exact thinking replacement used by lifecycle tests. */
 interface Replacement {
@@ -16,6 +17,7 @@ interface Replacement {
 /** Read-only observations and explicit test-session operations. */
 interface Harness {
   readonly adapter: Pick<Adapter, "run" | "newSession" | "turn">;
+  readonly events: Host["events"];
   readonly apply: (entries: readonly SessionBoundaryDraft[] | undefined) => void;
   readonly branch: readonly SessionEntry[];
   readonly config: (source: string) => void;
@@ -47,6 +49,7 @@ const model = (id: string): Model<Api> => ({
 /** In-memory pi authority. The protocol itself runs in the real WASM module. */
 class Session {
   readonly #branch: SessionEntry[] = [];
+  readonly #events = createEventBus();
   readonly #previous: SessionEntry[] = [];
   readonly #notices: string[] = [];
   readonly #selections: string[] = [];
@@ -104,6 +107,7 @@ class Session {
       appendEntry: (customType, data) => {
         this.#append({ customType, data, type: "custom" });
       },
+      events: this.#events,
       getActiveTools: () => ["read", "edit", "write"],
       getAllTools: () => this.#tools(),
       getSettings: () => ({
@@ -181,6 +185,7 @@ class Session {
         this.#source = source;
       },
       ctx: this.#context(),
+      events: this.#events,
       newBranch: (replacement) => {
         this.#newBranch(replacement);
       },

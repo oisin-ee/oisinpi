@@ -1,6 +1,7 @@
 # @oisin-ee/pi-prewalk
 
-Prewalk starts with the active planner model. After the planning nudge, a successful `todo` call opens the handoff gate.
+Prewalk starts with the active planner model. After the planning nudge, validated local task activation opens the handoff gate.
+Without the task-provider capability, a successful `todo` call opens the gate instead. Imported workers need no bookkeeping call.
 The first subsequent `edit` or `write` result switches the session to the target model, even if that result failed.
 Nested calls through codemode also count. Without a callable `todo` tool, the gate is open.
 

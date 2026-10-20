@@ -116,6 +116,11 @@ fn cycle<'a>(
         .get(id)
         .ok_or_else(|| error("UNIT_NOT_FOUND: unknown prerequisite"))?;
     let mut unique = HashSet::new();
+    if unit.imported.is_some() {
+        visiting.remove(id);
+        done.insert(id);
+        return Ok(());
+    }
     for dependency in &unit.draft.depends_on {
         if !unique.insert(dependency) {
             return Err(error("DEPENDENCY_DUPLICATE: repeated prerequisite"));
@@ -155,6 +160,9 @@ pub(crate) fn scope_conflict(left: &Unit, right: &Unit) -> bool {
 }
 
 pub(crate) fn prerequisites(list: &TodoList, unit: &Unit) -> Result<(), TodoError> {
+    if unit.imported.is_some() {
+        return Ok(()); // Frozen prerequisite evidence is validated with the import.
+    }
     let entries = units(list);
     for id in &unit.draft.depends_on {
         if !entries.iter().any(|(other, status, _)| {
@@ -226,7 +234,7 @@ pub(crate) fn validate_units(list: &TodoList) -> Result<(), TodoError> {
             nonempty(session)?;
             if *status != Status::InProgress
                 || !leaf
-                || unit.draft.assignment != Some(Assignment::Self_)
+                || (unit.draft.assignment != Some(Assignment::Self_) && unit.imported.is_none())
             {
                 return Err(error(
                     "INVALID_ACTIVATION: local work must be an active self-assigned leaf",

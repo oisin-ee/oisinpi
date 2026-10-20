@@ -12,7 +12,7 @@ type Host = Pick<
   | "getThinkingLevel"
   | "setThinkingLevel"
   | "setModel"
->;
+> & { readonly events: Readonly<ExtensionAPI["events"]> };
 /** Read-only pi facts. */
 interface Context {
   readonly cwd: string;

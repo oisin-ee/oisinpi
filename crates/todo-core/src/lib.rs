@@ -6,6 +6,9 @@ mod contract;
 mod contract_tests;
 mod deserialization;
 mod export;
+mod import;
+#[cfg(test)]
+mod import_tests;
 mod operations;
 mod provider;
 #[cfg(test)]
@@ -24,6 +27,7 @@ pub use contract::{
     UnitContract, UnitRef,
 };
 pub use export::export_digest;
+pub use import::{ImportReceipt, ImportedUnit, Seal, Seed, import_unit, imported, parse_seed};
 pub use operations::{Change, DraftItem, Item, LeafItem, Operation, Request, apply};
 pub use provider::{
     ActiveUnit, ClaimChange, ClaimInput, ClaimResult, SettlementChange, SettlementResult, active,
@@ -141,6 +145,36 @@ pub fn validate(list: &TodoList) -> Result<(), TodoError> {
         validate_labels(task.subtasks.iter().map(|child| child.content.as_str()))?;
         if !task.status.is_open() && task.subtasks.iter().any(|child| child.status.is_open()) {
             return Err(TodoError::OpenChildren(task.content.clone()));
+        }
+    }
+    let imported = validation::units(list)
+        .iter()
+        .any(|(unit, _, _)| unit.imported.is_some());
+    if imported
+        && (list.tasks.len() != 1
+            || list
+                .tasks
+                .first()
+                .is_some_and(|task| !task.subtasks.is_empty()))
+    {
+        return Err(validation::error(
+            "SEEDED_SCOPE_LOCKED: worker owns exactly one leaf",
+        ));
+    }
+    for task in &list.tasks {
+        if let Some(unit) = &task.unit {
+            import::validate_import(unit, &task.content, task.status, task.subtasks.is_empty())?;
+        }
+        for child in &task.subtasks {
+            if child
+                .unit
+                .as_ref()
+                .is_some_and(|unit| unit.imported.is_some())
+            {
+                return Err(validation::error(
+                    "SEEDED_SCOPE_LOCKED: worker import must be a standalone leaf",
+                ));
+            }
         }
     }
     validation::validate_units(list)

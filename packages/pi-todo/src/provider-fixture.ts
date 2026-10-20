@@ -18,9 +18,12 @@ const value = <Value>(result: Result<Value>): Value => {
   },
   /**
    * Creates and claims one worker through real registration.
+   * @param {string} repository Logical repository identity.
    * @returns {Promise<object>} Origin runtime and frozen handoff.
    */
-  worker = async (): Promise<{
+  worker = async (
+    repository = "oisinpi",
+  ): Promise<{
     test: RuntimeFixture;
     id: string;
     inspected: UnitContract;
@@ -29,6 +32,9 @@ const value = <Value>(result: Result<Value>): Value => {
     const test = await runtimeFixture(),
       draft = contract();
     draft.assignment = { kind: "worker", profile: "general" };
+    if (draft.scope !== undefined) {
+      draft.scope.repositoryId = repository;
+    }
     await test.todo({ items: [{ content: "Worker", contract: draft }], op: "init" });
     const id = firstId(branchSnapshot(test.manager.getBranch())),
       inspected = value(test.provider().inspect(id)),

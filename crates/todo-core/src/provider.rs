@@ -174,7 +174,7 @@ pub fn active(list: &TodoList, session_id: &str) -> Result<Option<ActiveUnit>, T
         .then(|| ActiveUnit {
             r#ref: unit.reference.clone(),
             local_session_id: session_id.to_owned(),
-            seeded: false,
+            seeded: unit.imported.is_some(),
         })
     }))
 }
@@ -412,6 +412,14 @@ pub fn settle(
     validate_result(input, &identity)?;
     if identity.origin.session_id != session_id {
         return Err(error("STALE_ORIGIN: another session owns this result"));
+    }
+    if units(&list)
+        .iter()
+        .any(|(unit, _, _)| unit.imported.is_some())
+    {
+        return Err(error(
+            "SEEDED_SCOPE_LOCKED: worker cannot settle its own execution",
+        ));
     }
     let (_, unit, _, _) = entry(&list, &identity.origin.unit_id)
         .map_err(|cause| error(&format!("STALE_ORIGIN: {cause}")))?;

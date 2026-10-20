@@ -128,6 +128,11 @@
   },
   "overrides": [
     {
+      // Node open flags require bitwise composition to avoid blocking on a seed FIFO.
+      "files": ["packages/pi-todo/src/source.ts"],
+      "rules": { "eslint/no-bitwise": ["error", { "allow": ["|"] }] }
+    },
+    {
       // pi loads an extension through its default export (docs/extensions.md),
       // and a tool's `execute` has five parameters, the last being the context.
       "files": ["packages/*/src/index.ts", "packages/pi-guardrails/src/pi/index.ts"],
@@ -142,7 +147,7 @@
     },
     {
       // The test makes a real symlink, the case `source.ts` exists for.
-      "files": ["packages/pi-todo/src/source.test.ts"],
+      "files": ["packages/pi-todo/src/source.test.ts", "packages/pi-todo/src/import-fixture.ts"],
       "rules": { "import/no-nodejs-modules": "off" }
     },
     {

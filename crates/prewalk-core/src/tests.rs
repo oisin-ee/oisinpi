@@ -26,6 +26,7 @@ fn facts(event: Event) -> Facts {
         available: vec!["test/planner".into(), "test/worker".into()],
         default: Some(selection("test/default")),
         todo: true,
+        active_unit: None,
         todo_owner: "test".into(),
         event,
     }
@@ -55,6 +56,39 @@ fn call(name: &str, success: bool) -> Call {
         name: name.into(),
         success,
     }
+}
+
+#[test]
+fn activation_opens_gate_without_synthetic_todo_and_keeps_post_edit_switch() {
+    let mut input = facts(Event::Turn {
+        calls: vec![call("read", true)],
+    });
+    input.branch = nudged();
+    input.active_unit = Some(true);
+    assert!(
+        decide(&input).actions.is_empty(),
+        "activation alone never switches model"
+    );
+    input.event = Event::Turn {
+        calls: vec![call("edit", true)],
+    };
+    assert!(
+        matches!(decide(&input).actions.first(), Some(Action::Select { .. })),
+        "first edit triggers the existing handoff"
+    );
+    input.active_unit = Some(false);
+    input.event = Event::Turn {
+        calls: vec![call("todo", true), call("edit", true)],
+    };
+    assert!(
+        decide(&input).actions.is_empty(),
+        "a successful view is not validated activation"
+    );
+    input.active_unit = None;
+    assert!(
+        matches!(decide(&input).actions.first(), Some(Action::Select { .. })),
+        "missing provider preserves legacy evidence"
+    );
 }
 
 #[test]

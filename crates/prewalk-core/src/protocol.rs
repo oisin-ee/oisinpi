@@ -242,12 +242,15 @@ fn new_session(facts: &Facts) -> Decision {
     decision
 }
 
-fn gate(cycle: &Cycle<'_>, todo: bool) -> bool {
+fn gate(cycle: &Cycle<'_>, facts: &Facts) -> bool {
+    if let Some(active) = facts.active_unit {
+        return active;
+    }
     let after_nudge = cycle.tail.iter().skip_while(|record| {
         !matches!(record,
         Record::Prompt { name, .. } if name == "prewalk-plan")
     });
-    !todo
+    !facts.todo
         || after_nudge
             .filter_map(|record| match record {
                 Record::Calls { calls } => Some(calls),
@@ -277,9 +280,9 @@ fn turn(facts: &Facts, calls: &[crate::types::Call], cycle: &Cycle<'_>) -> Decis
             again: true,
         };
     }
-    let mut open = gate(cycle, facts.todo);
+    let mut open = gate(cycle, facts);
     for call in calls {
-        open |= call.name == "todo" && call.success;
+        open |= facts.active_unit.is_none() && call.name == "todo" && call.success;
         if open && (call.name == "edit" || call.name == "write") {
             let mut actions = vec![Action::Select {
                 selection: target.clone(),
@@ -408,11 +411,7 @@ fn status(facts: &Facts, cycle: &Cycle<'_>) -> Decision {
     };
     notice(&format!(
         "Prewalk: {state}; gate {}; todo owner {}; config errors: {}",
-        if gate(cycle, facts.todo) {
-            "open"
-        } else {
-            "closed"
-        },
+        if gate(cycle, facts) { "open" } else { "closed" },
         facts.todo_owner,
         facts.report.errors.join("; ")
     ))

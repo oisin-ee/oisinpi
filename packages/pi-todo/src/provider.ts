@@ -1,6 +1,7 @@
 import type {
   ActiveUnit,
   ClaimResult,
+  ImportReceipt,
   SettlementResult,
   TodoList,
   UnitContract,
@@ -9,21 +10,26 @@ import type {
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { STATE_ENTRY, branchSnapshot } from "./state.ts";
 import type { TodoParams, TodoResult, TodoSession } from "./tool.ts";
-import { active, claim, inspect, protect, settle } from "./wasm.ts";
+import { active, claim, importUnit, imported, inspect, parse, protect, settle } from "./wasm.ts";
 import { ownsTodo } from "./lifecycle.ts";
+import { repositoryIdentity } from "./repository.ts";
 import { runTodo } from "./tool.ts";
 
 /** Stable extension-only result envelope. */
 type Result<Value> =
   | { readonly ok: true; readonly value: Value }
   | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } };
+/** Wire acknowledgements use explicit null for an unsealed import. */
+type ImportAcknowledgement = Omit<ImportReceipt, "seal"> & {
+  readonly seal: ImportReceipt["seal"] | null;
+};
 /** Capability acquisition does not expose a model-facing tool. */
 interface TaskProviderV1 {
   readonly inspect: (id: string) => Result<UnitContract>;
   readonly claim: (input: unknown) => Result<ClaimResult>;
   readonly settle: (input: unknown) => Result<SettlementResult>;
   readonly active: () => Result<ActiveUnit | null>;
-  readonly imported: () => Result<null>;
+  readonly imported: () => Result<ImportAcknowledgement | null>;
 }
 interface ProviderHost {
   readonly appendEntry: ExtensionAPI["appendEntry"];
@@ -130,6 +136,28 @@ class TaskProvider {
   }
 
   /**
+   * Imports startup transport through the same atomic mutation boundary.
+   * @param {string} source Untrusted seed JSON.
+   * @param {string} origin Checkout origin URL.
+   * @param {ExtensionContext} ctx Current runtime authority.
+   */
+  public import(source: string, origin: string, ctx: ExtensionContext): void {
+    this.context(ctx);
+    this.#mutation(() => {
+      const session = this.#session(),
+        change = importUnit(
+          branchSnapshot(session.branch()),
+          source,
+          session.sessionId,
+          repositoryIdentity(origin),
+        );
+      if (change.persist) {
+        session.append(STATE_ENTRY, change.list);
+      }
+    });
+  }
+
+  /**
    * Creates methods that recheck ownership and branch state.
    * @returns {TaskProviderV1} Extension-only capability.
    */
@@ -158,11 +186,7 @@ class TaskProvider {
             return change.value;
           }),
         ),
-      imported: () =>
-        respond(() => {
-          this.#session();
-          return null;
-        }),
+      imported: () => respond(() => this.#imported()),
       inspect: (id) => respond(() => inspect(branchSnapshot(this.#session().branch()), id)),
       settle: (input) =>
         respond(() =>
@@ -180,6 +204,14 @@ class TaskProvider {
           }),
         ),
     };
+  }
+
+  #imported(): ImportAcknowledgement | null {
+    const session = this.#session(),
+      receipt = imported(branchSnapshot(session.branch()), session.sessionId);
+    return receipt === undefined
+      ? null
+      : Object.assign({}, receipt, { seal: receipt.seal ?? null });
   }
 
   #respond<Value>(generation: symbol, operation: () => Value): Result<Value> {
@@ -203,6 +235,30 @@ class TaskProvider {
     }
   }
 
+  /**
+   * Rejects branch rewind around an immutable seed or seal.
+   * @param {ExtensionContext} ctx Runtime session.
+   * @param {TodoList} branch Current branch snapshot.
+   */
+  static #importScope(ctx: ExtensionContext, branch: TodoList): void {
+    const sessionId = ctx.sessionManager.getSessionId(),
+      receipt = imported(branch, sessionId);
+    for (const entry of ctx.sessionManager.getEntries()) {
+      if (entry.type === "custom" && entry.customType === STATE_ENTRY) {
+        const recorded = imported(parse(entry.data), sessionId);
+        if (
+          recorded !== undefined &&
+          (receipt === undefined ||
+            JSON.stringify(recorded.execution) !== JSON.stringify(receipt.execution) ||
+            recorded.digest !== receipt.digest ||
+            (recorded.seal !== undefined && receipt.seal === undefined))
+        ) {
+          throw new Error("SEEDED_SCOPE_LOCKED: branch cannot discard imported scope or its seal");
+        }
+      }
+    }
+  }
+
   #session(): TodoSession {
     const ctx = this.#context;
     if (ctx === undefined || !ownsTodo(this.#host)) {
@@ -211,6 +267,7 @@ class TaskProvider {
     const sessionId = ctx.sessionManager.getSessionId(),
       leaf = ctx.sessionManager.getLeafId(),
       before = branchSnapshot(ctx.sessionManager.getBranch());
+    TaskProvider.#importScope(ctx, before);
     return {
       append: (customType: string, list: TodoList): void => {
         if (

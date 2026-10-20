@@ -88,6 +88,35 @@ pub fn claim(
     Ok(todo_core::claim(list.to_rust()?, &input, session_id)?.into_ts()?)
 }
 
+/// Imports one validated seed into a fresh worker session.
+///
+/// # Errors
+/// Rejects invalid seed, repository identity or existing work.
+#[wasm_bindgen]
+pub fn import_unit(
+    list: &Ts<TodoList>,
+    input: &str,
+    session_id: &str,
+    repository_id: &str,
+) -> Result<Ts<Change>, JsError> {
+    let seed = todo_core::parse_seed(input)?;
+    Ok(todo_core::import_unit(list.to_rust()?, seed, session_id, repository_id)?.into_ts()?)
+}
+
+/// Reads immutable import acknowledgement and closure evidence.
+///
+/// # Errors
+/// Rejects invalid persisted state.
+#[wasm_bindgen]
+pub fn imported(
+    list: &Ts<TodoList>,
+    session_id: &str,
+) -> Result<Option<Ts<todo_core::ImportReceipt>>, JsError> {
+    todo_core::imported(&list.to_rust()?, session_id)?
+        .map(|value| value.into_ts().map_err(JsError::from))
+        .transpose()
+}
+
 /// Records an executor's exact release evidence, never acceptance.
 ///
 /// # Errors

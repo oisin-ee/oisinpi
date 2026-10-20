@@ -16,6 +16,9 @@ type TodoAPI = Readonly<
     | "appendEntry"
     | "events"
     | "getAllTools"
+    | "getFlag"
+    | "registerFlag"
+    | "exec"
     | "on"
     | "registerCommand"
     | "registerShortcut"
@@ -63,6 +66,19 @@ const silent = (): void => {
         source: "extension",
       },
     })),
+  /**
+   * Converts the registered execution surface to a typed test caller.
+   * @param {Readonly<object>} tool Registered tool definition.
+   * @returns {Registered} Captured registration.
+   */
+  registeredTool = <Params extends TSchema, Details, State>(
+    tool: Readonly<Pick<ToolDefinition<Params, Details, State>, "execute" | "name" | "parameters">>,
+  ): Registered => ({
+    execute: async (params, ctx) =>
+      tool.execute("test", parse(tool.parameters, params), undefined, undefined, ctx),
+    name: tool.name,
+    parameters: tool.parameters,
+  }),
   registration = (
     session: Readonly<Pick<SessionManager, "appendCustomEntry">> = SessionManager.inMemory(),
   ): Registration => {
@@ -79,16 +95,19 @@ const silent = (): void => {
           emit: silent,
           on: (): (() => void) => silent,
         },
+        exec: async () => {
+          throw new Error("Unexpected startup execution");
+        },
         getAllTools: () => metadata(tools),
+        getFlag: () => new Map<string, string>().get("todo-unit-file"),
         on: (event): (() => void) => {
           events.push(event);
-          return (): void => {
-            // No subscriptions need cleanup in this mock.
-          };
+          return silent;
         },
         registerCommand: (name): void => {
           commands.push(name);
         },
+        registerFlag: silent,
         registerShortcut: (key): void => {
           shortcuts.push(key);
         },
@@ -97,12 +116,7 @@ const silent = (): void => {
             Pick<ToolDefinition<Params, Details, State>, "execute" | "name" | "parameters">
           >,
         ): void => {
-          tools.push({
-            execute: async (params, ctx) =>
-              tool.execute("test", parse(tool.parameters, params), undefined, undefined, ctx),
-            name: tool.name,
-            parameters: tool.parameters,
-          });
+          tools.push(registeredTool(tool));
         },
         sendMessage: silent,
       },

@@ -5,6 +5,7 @@ import { TaskProvider } from "./provider.ts";
 import { TodoPresentation } from "./presentation.ts";
 import { TodoWork } from "./work.ts";
 import type { WorkHost } from "./work.ts";
+import { WorkerImport } from "./handoff.ts";
 import { parameters } from "./schema.ts";
 import { registerGate } from "./gate.ts";
 import { workUnitGuidance } from "./guidance.ts";
@@ -15,6 +16,9 @@ type TodoAPI = WorkHost &
       ExtensionAPI,
       | "appendEntry"
       | "getAllTools"
+      | "getFlag"
+      | "registerFlag"
+      | "exec"
       | "on"
       | "registerCommand"
       | "registerShortcut"
@@ -31,7 +35,12 @@ export default function piTodo(pi: TodoAPI): void {
   const handoff = new PlannotatorHandoff(pi),
     presentation = new TodoPresentation(),
     work = new TodoWork(pi, presentation),
-    provider = new TaskProvider(pi);
+    provider = new TaskProvider(pi),
+    workerImport = new WorkerImport(pi, provider);
+  pi.registerFlag("todo-unit-file", {
+    description: "Executor-owned task seed for a fresh worker session",
+    type: "string",
+  });
   work.register(pi);
   provider.register();
   registerGate(pi, provider);
@@ -48,8 +57,9 @@ export default function piTodo(pi: TodoAPI): void {
     name: "todo",
     parameters,
   });
-  pi.on("session_start", (_event, ctx) => {
+  pi.on("session_start", async (event, ctx) => {
     provider.context(ctx);
+    await workerImport.start(event, ctx);
     presentation.start(pi, ctx);
     work.start(ctx);
     handoff.start(ctx);

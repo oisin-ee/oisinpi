@@ -1,5 +1,5 @@
 import type { CustomEntry, SessionEntry } from "@earendil-works/pi-coding-agent";
-import type { TodoList, UnitRef } from "./wasm.ts";
+import type { ExecutionRef, TodoList, UnitRef } from "./wasm.ts";
 import { parse } from "./wasm.ts";
 
 /** The snapshot of a branch with no list yet. */
@@ -42,28 +42,64 @@ const EMPTY: unknown = { tasks: [] },
       origin = origins.get(key) ?? entryId;
     origins.set(key, origin);
     return origin;
-  },
+  };
+
+/** Derives entry provenance without rewriting the imported lead reference. */
+class Provenance {
+  readonly #origins = new Map<string, string>();
+  readonly #seals = new Map<string, string>();
+
   /**
-   * Reads revision origins from the entries that first introduced them.
-   * Status-only snapshots cannot move a revision's origin.
-   * @param {readonly SessionEntry[]} branch Current branch in chronological order.
-   * @returns {TodoList} Validated snapshot with derived provenance.
+   * Resolves contract and seal provenance for one task snapshot.
+   * @param {Readonly<object>} unit Task provenance fields.
+   * @param {string} entryId Snapshot identity.
    */
-  branchSnapshot = (branch: readonly SessionEntry[]): TodoList => {
-    const origins = new Map<string, string>();
-    let current: TodoList = { tasks: [] };
-    for (const entry of branch) {
-      if (isStateEntry(entry)) {
-        current = parse(entry.data);
-        const tasks = current.tasks.flatMap((task) => [task, ...(task.subtasks ?? [])]);
-        for (const task of tasks) {
-          if (task.unit !== undefined) {
-            task.unit.reference.contractEntryId = originFor(task.unit.reference, entry.id, origins);
+  public resolve(
+    unit: {
+      readonly reference: Readonly<UnitRef>;
+      readonly imported:
+        | {
+            readonly seed: { readonly execution: Readonly<ExecutionRef> };
+            readonly seal: { readonly entryId: string } | undefined;
           }
-        }
+        | undefined;
+    },
+    entryId: string,
+  ): void {
+    if (unit.imported === undefined) {
+      Object.assign(unit.reference, {
+        contractEntryId: originFor(unit.reference, entryId, this.#origins),
+      });
+    } else if (unit.imported.seal !== undefined) {
+      const key = JSON.stringify(unit.imported.seed.execution),
+        sealEntry = this.#seals.get(key) ?? entryId;
+      this.#seals.set(key, sealEntry);
+      Object.assign(unit.imported.seal, { entryId: sealEntry });
+    }
+  }
+}
+
+/**
+ * Reads revision origins from the entries that first introduced them.
+ * Status-only snapshots cannot move a revision's origin.
+ * @param {readonly SessionEntry[]} branch Current branch in chronological order.
+ * @returns {TodoList} Validated snapshot with derived provenance.
+ */
+const branchSnapshot = (branch: readonly SessionEntry[]): TodoList => {
+  const provenance = new Provenance();
+  let current: TodoList = { tasks: [] };
+  for (const entry of branch.filter((candidate) => isStateEntry(candidate))) {
+    current = parse(entry.data);
+    for (const task of current.tasks.flatMap((root) => [root, ...(root.subtasks ?? [])])) {
+      if (task.unit !== undefined) {
+        provenance.resolve(
+          { imported: task.unit.imported, reference: task.unit.reference },
+          entry.id,
+        );
       }
     }
-    return current;
-  };
+  }
+  return current;
+};
 
 export { STATE_ENTRY, branchSnapshot, latestSnapshot };

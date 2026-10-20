@@ -127,6 +127,8 @@ pub struct Unit {
     /// The last claimed revision cannot launch again after settlement.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attempted_revision: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub imported: Option<crate::ImportedUnit>,
 }
 
 /// Trusted runtime identity, separate from agent-authored tool parameters.
@@ -183,6 +185,7 @@ impl Unit {
             evidence: vec![],
             accepted_events: vec![],
             attempted_revision: None,
+            imported: None,
         }
     }
 
