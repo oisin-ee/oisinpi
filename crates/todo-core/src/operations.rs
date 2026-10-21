@@ -29,6 +29,9 @@ pub enum Operation {
 pub struct DraftItem {
     pub content: String,
     #[serde(default)]
+    #[cfg_attr(feature = "wasm", tsify(optional))]
+    pub description: Option<String>,
+    #[serde(default)]
     pub key: Option<String>,
     #[serde(default)]
     pub contract: ContractDraft,
@@ -51,6 +54,9 @@ pub enum Item {
     Text(String),
     Outcome {
         content: String,
+        #[serde(default)]
+        #[cfg_attr(feature = "wasm", tsify(optional))]
+        description: Option<String>,
         subtasks: Vec<LeafItem>,
     },
     Draft(Box<DraftItem>),
@@ -77,6 +83,16 @@ pub struct Request {
     pub start: Option<String>,
     #[cfg_attr(feature = "wasm", tsify(optional, type = "string | undefined"))]
     pub evidence: Option<String>,
+    /// For `update`: sets the description; blank clears it; absent leaves it.
+    #[cfg_attr(feature = "wasm", tsify(optional, type = "string | undefined"))]
+    pub description: Option<String>,
+}
+
+/// Trims a description; blank means none.
+fn clean(description: Option<String>) -> Option<String> {
+    description
+        .map(|text| text.trim().to_owned())
+        .filter(|text| !text.is_empty())
 }
 
 /// A successful operation; views never persist a snapshot.
@@ -96,6 +112,7 @@ pub(crate) fn legacy(items: Vec<String>) -> Result<TodoList, TodoError> {
             .into_iter()
             .map(|content| Task {
                 content: content.trim().to_owned(),
+                description: None,
                 status: Status::Pending,
                 subtasks: vec![],
                 unit: None,
@@ -106,6 +123,10 @@ pub(crate) fn legacy(items: Vec<String>) -> Result<TodoList, TodoError> {
     Ok(list)
 }
 
+const fn changes_nothing(request: &Request) -> bool {
+    request.contract.is_none() && request.description.is_none()
+}
+
 const fn arguments(request: &Request) -> Result<(), TodoError> {
     let invalid = match request.op {
         Operation::Init => request.parent.is_some() || request.task.is_some(),
@@ -114,7 +135,7 @@ const fn arguments(request: &Request) -> Result<(), TodoError> {
             request.items.is_some() || request.task.is_none() || request.start.is_some()
         }
         Operation::Update => {
-            request.items.is_some() || request.task.is_none() || request.contract.is_none()
+            request.items.is_some() || request.task.is_none() || changes_nothing(request)
         }
         Operation::Done | Operation::Drop => {
             request.items.is_some()
@@ -129,7 +150,8 @@ const fn arguments(request: &Request) -> Result<(), TodoError> {
         }
     };
     if invalid
-        || (request.contract.is_some() && !matches!(request.op, Operation::Update))
+        || ((request.contract.is_some() || request.description.is_some())
+            && !matches!(request.op, Operation::Update))
         || (request.evidence.is_some() && !matches!(request.op, Operation::Done))
     {
         Err(TodoError::InvalidRequest)
@@ -144,9 +166,9 @@ fn draft_item(
     index: usize,
     keys: &mut HashMap<String, String>,
 ) -> Result<Subtask, TodoError> {
-    let (content, draft, key) = match item {
-        LeafItem::Text(content) => (content, ContractDraft::default(), None),
-        LeafItem::Draft(item) => (item.content, item.contract, item.key),
+    let (content, description, draft, key) = match item {
+        LeafItem::Text(content) => (content, None, ContractDraft::default(), None),
+        LeafItem::Draft(item) => (item.content, item.description, item.contract, item.key),
     };
     let unit = Unit::new(runtime, index, draft);
     if let Some(key) = key {
@@ -159,6 +181,7 @@ fn draft_item(
     }
     Ok(Subtask {
         content: content.trim().to_owned(),
+        description: clean(description),
         status: Status::Pending,
         unit: Some(unit),
     })
@@ -192,7 +215,19 @@ fn create(
         let (item, subtasks) = match item {
             Item::Text(content) => (LeafItem::Text(content), vec![]),
             Item::Draft(draft) => (LeafItem::Draft(draft), vec![]),
-            Item::Outcome { content, subtasks } => (LeafItem::Text(content), subtasks),
+            Item::Outcome {
+                content,
+                description,
+                subtasks,
+            } => {
+                let root = DraftItem {
+                    content,
+                    description,
+                    key: None,
+                    contract: ContractDraft::default(),
+                };
+                (LeafItem::Draft(Box::new(root)), subtasks)
+            }
         };
         let root = draft_item(item, runtime, index, &mut keys)?;
         index += 1;
@@ -203,6 +238,7 @@ fn create(
         }
         tasks.push(Task {
             content: root.content,
+            description: root.description,
             status: root.status,
             unit: root.unit,
             subtasks: children,
@@ -262,6 +298,7 @@ fn add(
             .subtasks
             .extend(tasks.into_iter().map(|task| Subtask {
                 content: task.content,
+                description: task.description,
                 status: task.status,
                 unit: task.unit,
             }));
@@ -281,6 +318,7 @@ fn start(
         status,
         unit,
         leaf,
+        ..
     } = selected(list, request)?;
     if !leaf {
         return Err(error("NOT_EXECUTABLE: a parent is not a work unit"));
@@ -313,16 +351,31 @@ fn start(
 }
 
 fn update(list: &mut TodoList, request: &Request) -> Result<(), TodoError> {
-    let Selected { status, unit, .. } = selected(list, request)?;
+    let Selected {
+        status,
+        unit,
+        description,
+        ..
+    } = selected(list, request)?;
     let unit = unit
         .as_mut()
         .ok_or_else(|| error("INVALID_IDENTITY: migration required"))?;
-    if !status.is_open() || unit.local_session_id.is_some() {
+    if !status.is_open() {
         return Err(error(
             "UNIT_FROZEN: only pending or non-executing legacy contracts can change",
         ));
     }
-    let draft = request.contract.clone().ok_or(TodoError::InvalidRequest)?;
+    if request.description.is_some() {
+        *description = clean(request.description.clone());
+    }
+    let Some(draft) = request.contract.clone() else {
+        return Ok(());
+    };
+    if unit.local_session_id.is_some() {
+        return Err(error(
+            "UNIT_FROZEN: only pending or non-executing legacy contracts can change",
+        ));
+    }
     if unit.draft != draft || unit.attempted_revision == Some(unit.reference.revision) {
         unit.draft = draft;
         unit.reference.revision = unit
@@ -399,6 +452,7 @@ fn completion(
         status,
         unit,
         leaf,
+        ..
     } = selected(list, request)?;
     if !status.is_open() || !leaf {
         return Ok(());
