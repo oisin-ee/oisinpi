@@ -1,4 +1,6 @@
 # Dogsled worktree setup. Proto loads repository plugins (wasm-bindgen, shfmt) only from
 # trusted `.prototools` files, and trust is per path, so each new worktree needs it.
+# `moon ci` and the pre-commit hook do not install dependencies in a fresh worktree;
+# without node_modules they resolve tsc, vitest, oxfmt, and tsgolint from elsewhere and fail.
 [worktree]
-setup = ["proto trust .prototools"]
+setup = ["proto trust .prototools", "proto run pnpm -- install --frozen-lockfile"]
