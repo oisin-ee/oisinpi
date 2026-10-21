@@ -4,6 +4,8 @@ mod binding;
 mod contract;
 #[cfg(test)]
 mod contract_tests;
+#[cfg(test)]
+mod description_tests;
 mod deserialization;
 mod export;
 mod import;
@@ -63,6 +65,10 @@ impl Status {
 #[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
 pub struct Subtask {
     pub content: String,
+    /// Detail behind the short `content` headline.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "wasm", tsify(optional))]
+    pub description: Option<String>,
     pub status: Status,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unit: Option<Unit>,
@@ -74,6 +80,10 @@ pub struct Subtask {
 #[serde(deny_unknown_fields)]
 pub struct Task {
     pub content: String,
+    /// Detail behind the short `content` headline.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "wasm", tsify(optional))]
+    pub description: Option<String>,
     pub status: Status,
     #[serde(default)]
     pub subtasks: Vec<Subtask>,
@@ -241,11 +251,17 @@ pub fn view(list: &TodoList) -> String {
             ""
         };
         lines.push(format!("{} {}{review}", mark(task.status), task.content));
+        if let Some(description) = &task.description {
+            lines.push(format!("  {description}"));
+        }
         if let Some(unit) = &task.unit {
             lines.push(format!("    {}", unit.summary()));
         }
         for child in &task.subtasks {
             lines.push(format!("  {} {}", mark(child.status), child.content));
+            if let Some(description) = &child.description {
+                lines.push(format!("    {description}"));
+            }
             if let Some(unit) = &child.unit {
                 lines.push(format!("      {}", unit.summary()));
             }

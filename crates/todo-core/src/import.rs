@@ -172,6 +172,7 @@ pub fn import_unit(
     let list = TodoList {
         tasks: vec![Task {
             content: title,
+            description: None,
             status: Status::InProgress,
             subtasks: vec![],
             unit: Some(unit),

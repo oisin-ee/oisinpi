@@ -17,6 +17,7 @@ fn request(op: Operation, task: Option<String>) -> Request {
         contract: None,
         start: None,
         evidence: None,
+        description: None,
     }
 }
 

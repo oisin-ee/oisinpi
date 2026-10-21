@@ -126,6 +126,7 @@ fn select<'a>(list: &'a mut TodoList, id: &str) -> Result<Selected<'a>, TodoErro
             contract: None,
             start: None,
             evidence: None,
+            description: None,
         },
     )
     .map_err(|cause| error(&format!("UNIT_NOT_FOUND: {cause}")))

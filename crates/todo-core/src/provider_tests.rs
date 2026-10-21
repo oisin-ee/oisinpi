@@ -16,6 +16,7 @@ fn request(op: Operation, id: &str) -> Request {
         contract: None,
         start: None,
         evidence: None,
+        description: None,
     }
 }
 fn execution(id: &str) -> ExecutionRef {
@@ -280,6 +281,7 @@ fn held_child_blocks_parent_cascade_and_keeps_explicit_parent_review() {
     let mut parent = init(vec!["Outcome".to_owned()]).unwrap();
     parent.tasks[0].subtasks.push(Subtask {
         content: child.content,
+        description: child.description,
         status: child.status,
         unit: child.unit,
     });

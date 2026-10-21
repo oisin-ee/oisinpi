@@ -31,6 +31,7 @@ pub struct WidgetRow {
 pub struct SectionChild {
     pub status: Status,
     pub text: String,
+    pub description: Option<String>,
     pub unit: Option<String>,
 }
 
@@ -41,6 +42,7 @@ pub struct SectionItem {
     pub status: Status,
     pub text: String,
     pub review: bool,
+    pub description: Option<String>,
     pub unit: Option<String>,
     pub children: Vec<SectionChild>,
 }
@@ -76,6 +78,7 @@ pub fn sections(list: &TodoList) -> Vec<TodoSection> {
                     status: task.status,
                     text: task.content.clone(),
                     review: task.ready_for_review(),
+                    description: task.description.clone(),
                     unit: task.unit.as_ref().map(crate::Unit::summary),
                     children: task
                         .subtasks
@@ -83,6 +86,7 @@ pub fn sections(list: &TodoList) -> Vec<TodoSection> {
                         .map(|child| SectionChild {
                             status: child.status,
                             text: child.content.clone(),
+                            description: child.description.clone(),
                             unit: child.unit.as_ref().map(crate::Unit::summary),
                         })
                         .collect(),
@@ -197,6 +201,7 @@ mod tests {
             .into_iter()
             .map(|(content, status)| Task {
                 content: content.to_owned(),
+                description: None,
                 status,
                 subtasks: vec![],
                 unit: None,
@@ -255,6 +260,7 @@ mod tests {
         let list = TodoList {
             tasks: vec![Task {
                 content: "Finished".to_owned(),
+                description: None,
                 status: Status::Completed,
                 subtasks: vec![],
                 unit: None,
@@ -311,14 +317,17 @@ mod tests {
         let unit = |index| Unit::new(&context, index, ContractDraft::default());
         let mut list = list();
         list.tasks[1].unit = Some(unit(0));
+        list.tasks[1].description = Some("Ship the widget".to_owned());
         list.tasks[1].subtasks = vec![
             Subtask {
                 content: "Measure".to_owned(),
+                description: Some("Time the cold start".to_owned()),
                 status: Status::Completed,
                 unit: Some(unit(1)),
             },
             Subtask {
                 content: "Skip".to_owned(),
+                description: None,
                 status: Status::Abandoned,
                 unit: None,
             },
@@ -330,11 +339,13 @@ mod tests {
                 status: Status::InProgress,
                 text: "Build the widget".to_owned(),
                 review: true,
+                description: Some("Ship the widget".to_owned()),
                 unit: Some("u-m-0 r1 · draft · assignment missing · scope missing".to_owned()),
                 children: vec![
                     SectionChild {
                         status: Status::Completed,
                         text: "Measure".to_owned(),
+                        description: Some("Time the cold start".to_owned()),
                         unit: Some(
                             "u-m-1 r1 · draft · assignment missing · scope missing".to_owned()
                         ),
@@ -342,6 +353,7 @@ mod tests {
                     SectionChild {
                         status: Status::Abandoned,
                         text: "Skip".to_owned(),
+                        description: None,
                         unit: None,
                     },
                 ],

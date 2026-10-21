@@ -104,12 +104,14 @@ mod tests {
             tasks: vec![
                 crate::Task {
                     content: "done".to_owned(),
+                    description: None,
                     status: Status::Completed,
                     subtasks: vec![],
                     unit: None,
                 },
                 crate::Task {
                     content: "dropped".to_owned(),
+                    description: None,
                     status: Status::Abandoned,
                     subtasks: vec![],
                     unit: None,

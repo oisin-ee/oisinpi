@@ -19,6 +19,7 @@ fn request(op: Operation) -> Request {
         contract: None,
         start: None,
         evidence: None,
+        description: None,
     }
 }
 fn draft() -> ContractDraft {
@@ -43,6 +44,7 @@ fn create(start: bool) -> TodoList {
     let mut req = request(Operation::Init);
     req.items = Some(vec![Item::Draft(Box::new(DraftItem {
         content: "Build".to_owned(),
+        description: None,
         key: Some("build".to_owned()),
         contract: draft(),
     }))]);
