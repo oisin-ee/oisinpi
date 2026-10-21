@@ -6,7 +6,13 @@
   "commit": false,
   "ignore": [],
   "fixed": [
-    ["@oisin-ee/pi-todo", "@oisin-ee/pi-prewalk", "@oisin-ee/pi-guardrails", "@oisin-ee/oisinpi"]
+    [
+      "@oisin-ee/pi-todo",
+      "@oisin-ee/pi-prewalk",
+      "@oisin-ee/pi-tiers",
+      "@oisin-ee/pi-guardrails",
+      "@oisin-ee/oisinpi"
+    ]
   ],
   "linked": [],
   "updateInternalDependencies": "patch"

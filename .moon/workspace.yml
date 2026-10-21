@@ -10,6 +10,7 @@ projects:
   prewalk-core: crates/prewalk-core
   prewalk-wasm: crates/prewalk-wasm
   pi-prewalk: packages/pi-prewalk
+  pi-tiers: packages/pi-tiers
   pi-guardrails: packages/pi-guardrails
 vcs:
   defaultBranch: main

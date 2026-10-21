@@ -147,7 +147,11 @@
     },
     {
       // The test makes a real symlink, the case `source.ts` exists for.
-      "files": ["packages/pi-todo/src/source.test.ts", "packages/pi-todo/src/import-fixture.ts"],
+      "files": [
+        "packages/pi-todo/src/source.test.ts",
+        "packages/pi-todo/src/import-fixture.ts",
+        "packages/pi-tiers/src/source.test.ts"
+      ],
       "rules": { "import/no-nodejs-modules": "off" }
     },
     {
