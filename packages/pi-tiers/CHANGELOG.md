@@ -1,5 +1,11 @@
 # @oisin-ee/pi-tiers
 
+## 0.9.2
+
+### Patch Changes
+
+- [#26](https://github.com/oisin-ee/oisinpi/pull/26) [`3e750ac`](https://github.com/oisin-ee/oisinpi/commit/3e750ace481cfcf55296da1df034473d86d74347) Thanks [@momo-momokaya](https://github.com/apps/momo-momokaya)! - Match tier targets to registry models and quota pools without regard to case. The tier file says `minimax-m3.1-flash`, but the provider lists `MiniMax-M3.1-Flash`. Before, the router treated that model as unlisted forever and filed its quota under the wrong pool. It now dispatches the registry's exact id and uses the `minimax` pool.
+
 ## 0.9.1
 
 ### Patch Changes
