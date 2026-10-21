@@ -10,7 +10,23 @@ import type { Window } from "./quota.ts";
 
 const ZERO = 0,
   ONE = 1,
-  CACHE_MS = 60_000;
+  CACHE_MS = 60_000,
+  /**
+   * Keeps only targets the model registry lists, so a provider model that is not
+   * configured yet behaves like an unavailable target instead of a terminal error.
+   * @param {readonly string[]} targets Ordered tier.
+   * @param {Context} ctx Pi authority.
+   * @returns {readonly string[]} Listed targets, in tier order.
+   */
+  listed = (targets: readonly string[], ctx: Context): readonly string[] => {
+    const available = new Set(
+      ctx.modelRegistry.getAvailable().map((candidate) => `${candidate.provider}/${candidate.id}`),
+    );
+    return targets.filter((reference) => {
+      const parsed = target(reference);
+      return available.has(`${parsed.provider}/${parsed.id}`);
+    });
+  };
 
 /** Sticky routing with host-wide quota and gateway health. */
 class Router {
@@ -139,19 +155,20 @@ class Router {
 
   /**
    * Routes a tier without fabricating conversation messages.
-   * @param {readonly string[]} targets Ordered physical models.
+   * @param {readonly string[]} tier Ordered physical models, listed or not.
    * @param {Request} request Pi request.
    * @param {Context} ctx Pi authority.
    * @returns {Promise<ModelRoute<State>>} Physical dispatch.
    */
   public async route(
-    targets: readonly string[],
+    tier: readonly string[],
     request: Request,
     ctx: Context,
   ): Promise<ModelRoute<State>> {
     request.signal?.throwIfAborted();
     await this.#refresh();
-    const previous =
+    const targets = listed(tier, ctx),
+      previous =
         request.reason === "direct"
           ? undefined
           : (branchState(ctx.sessionManager.getBranch(), request.model.id) ?? request.state),
@@ -163,7 +180,9 @@ class Router {
       state = await this.#retry(request, current),
       health = await this.#effects.read(),
       chosen =
-        !state.attempted.includes(state.chosen) && this.#available(state.chosen, health)
+        targets.includes(state.chosen) &&
+        !state.attempted.includes(state.chosen) &&
+        this.#available(state.chosen, health)
           ? state.chosen
           : await this.next(targets, state);
     if (chosen === undefined) {
@@ -173,4 +192,4 @@ class Router {
   }
 }
 
-export { Router };
+export { Router, listed };
