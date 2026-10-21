@@ -48,8 +48,10 @@ For multiple blocked windows, an account becomes available after its last reset.
 The first available account ends the pool exclusion.
 
 The shared store is `~/.pi/agent/state/pi-tiers/state.json`.
-An exclusive `lock` file protects each read-modify-write transaction. A temporary file and atomic rename protect readers.
-Lock acquisition stops after two seconds. A stale lock requires operator removal after its owning process stops.
+An exclusive `lock/` directory protects each read-modify-write transaction. Its `owner.json` records the process ID and creation time.
+A temporary state file and atomic rename protect readers. Lock acquisition stops after two seconds.
+A dead owner or a lock older than 30 seconds permits takeover through atomic directory rename.
+An ownerless directory also expires after 30 seconds. Retired generations remain for 60 seconds to exclude competing takeovers.
 Invalid state and filesystem failures stop routing rather than discard shared health.
 
 Pi 1.3.0 response events contain no model or request identity.

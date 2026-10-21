@@ -60,9 +60,9 @@ describe("terminal failures", () => {
     const test = new Harness(TARGETS);
     await test.dispatch();
     await expect(test.settle("unknown model")).resolves.toBe(false);
-    await expect(test.settle("503", "aborted")).resolves.toBe(false);
+    await expect(test.settle("HTTP 503", "aborted")).resolves.toBe(false);
     test.abort.abort();
-    await expect(test.settle("429")).resolves.toBe(false);
+    await expect(test.settle("HTTP 429")).resolves.toBe(false);
     expect(test.health).toStrictEqual({ circuits: {}, pools: {} });
   });
 
@@ -70,11 +70,11 @@ describe("terminal failures", () => {
     expect.hasAssertions();
     const test = new Harness(TARGETS);
     await test.dispatch();
-    await expect(test.settle("503")).resolves.toBe(true);
+    await expect(test.settle("HTTP 503")).resolves.toBe(true);
     await test.dispatch("user", false);
-    await expect(test.settle("503")).resolves.toBe(true);
+    await expect(test.settle("HTTP 503")).resolves.toBe(true);
     await test.dispatch("user", false);
-    await expect(test.settle("503")).resolves.toBe(false);
+    await expect(test.settle("HTTP 503")).resolves.toBe(false);
     expect(test.dispatched).toHaveLength(COUNT);
   });
 });

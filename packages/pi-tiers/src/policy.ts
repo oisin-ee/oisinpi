@@ -33,23 +33,29 @@ const ZERO = 0,
   classify = (message: string, status?: number): Failure => {
     if (
       REQUEST_STATUSES.has(status ?? ZERO) ||
-      /unknown model|\b(?:400|401|403)\b|unauthorized|forbidden/iu.test(message)
+      /unknown model|\b(?:status|code|HTTP)\s*:?\s*(?:400|401|403)\b|unauthorized|forbidden/iu.test(
+        message,
+      )
     ) {
       return "request";
     }
     if (
       GATEWAY_STATUSES.has(status ?? ZERO) ||
-      /\b(?:502|503)\b|no available server|bad gateway|unable to connect/iu.test(message)
+      /\b(?:status|code|HTTP)\s*:?\s*(?:502|503)\b|no available server|bad gateway|unable to connect/iu.test(
+        message,
+      )
     ) {
       return "gateway";
     }
     if (
       status === QUOTA_STATUS ||
-      /\b429\b|usage.limit|rate_limit|insufficient_quota|quota exceeded/iu.test(message)
+      /\b(?:status|code|HTTP)\s*:?\s*429\b|usage.limit|rate_limit|insufficient_quota|quota exceeded/iu.test(
+        message,
+      )
     ) {
       return "quota";
     }
-    return /overloaded|timeout|timed out|websocket.*1006|server_busy/iu.test(message)
+    return /overloaded|timeout|timed out|websocket.*1006|server_busy|retry after/iu.test(message)
       ? "transient"
       : "request";
   },
