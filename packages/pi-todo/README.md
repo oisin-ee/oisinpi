@@ -25,6 +25,8 @@ The model calls `todo` with one `op`. Tasks are addressed by their exact content
 Creation and append leave tasks pending. Nothing starts automatically. This replaces the previous single-active, automatic-start behavior.
 Use `start` to activate or reopen work explicitly. Starting a child also opens its parent. Starting a parent does not start its children.
 
+Keep `content` a short headline: aim under 60 characters, imperative, no trailing detail. Put context, approach, or acceptance detail in the optional `description` (one or two sentences). Outcomes and subtask drafts accept `description`; a plain string item has none. A blank description counts as none. `update` with `description` sets it on an open task or subtask, and a blank value clears it. It never changes `content` or how a task is selected. `view` prints a description on the line under its headline; the Pi widget shows headlines only.
+
 `items` accepts strings or outcomes with string subtasks:
 
 ```json
@@ -89,8 +91,10 @@ Alt+J/K scrolls the hosted rows. Alt+I toggles their expansion. Ordinary editor 
 `/todos` and Alt+T request the shared Todos view. `/todos list` still prints the full list.
 When shared presentation ends, the standalone widget returns without changing task state.
 
-The [version 2 display contract](https://github.com/oisin-ee/dogsled/blob/main/docs/pi-work.md)
+The [version 3 display contract](https://github.com/oisin-ee/dogsled/blob/main/docs/pi-work.md)
 defines the snapshot request, acknowledgement, release, and read-only view events.
+Version 3 adds `display.sections` to the snapshot: four typed status groups (`in_progress`, `pending`, `completed`, `abandoned`), always present and in that order, each with a count and its items. Each item carries its text, optional description, review flag, contract summary, and all subtasks (each with its own optional description). The core owns this grouping; a presenter only draws it.
+Pi-todo does not answer version 2 requests.
 Incompatible versions leave the standalone widget available. Rendering failures restore it without changing saved tasks.
 
 ## Plannotator plans

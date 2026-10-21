@@ -5,7 +5,9 @@
 //! JavaScript fails as an ordinary `Result` inside the function and leaks
 //! nothing (tsify README, "Why are the `wasm_abi` attributes deprecated").
 
-use todo_core::{Change, MutationContext, ReminderHistory, Request, TodoList, WidgetRow};
+use todo_core::{
+    Change, MutationContext, ReminderHistory, Request, TodoList, TodoSection, WidgetRow,
+};
 use tsify::{Ts, Tsify};
 use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::{JsError, wasm_bindgen};
@@ -170,6 +172,19 @@ pub fn completion_reminder(facts: &Ts<ReminderHistory>) -> Result<Option<String>
 #[wasm_bindgen]
 pub fn view(list: &Ts<TodoList>) -> Result<String, JsError> {
     Ok(todo_core::view(&list.to_rust()?))
+}
+
+/// Typed status groups of `list`: always four sections, in a fixed order.
+///
+/// # Errors
+///
+/// Throws when `list` is not a valid todo list.
+#[wasm_bindgen]
+pub fn sections(list: &Ts<TodoList>) -> Result<Vec<Ts<TodoSection>>, JsError> {
+    todo_core::sections(&list.to_rust()?)
+        .into_iter()
+        .map(|section| section.into_ts().map_err(JsError::from))
+        .collect()
 }
 
 /// Human-facing rows for `list`, or `undefined` for an empty list.

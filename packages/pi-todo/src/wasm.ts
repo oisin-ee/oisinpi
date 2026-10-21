@@ -25,6 +25,7 @@ export {
   completion_reminder as completionReminder,
   init,
   parse,
+  sections,
   view,
   widget,
 } from "./generated/todo_core.js";
@@ -51,10 +52,13 @@ export type {
   Operation,
   ReminderFact,
   Request,
+  SectionChild,
+  SectionItem,
   Status,
   Subtask,
   Task,
   TodoList,
+  TodoSection,
   WidgetKind,
   WidgetRow,
 } from "./generated/todo_core.js";

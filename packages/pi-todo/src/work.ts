@@ -12,7 +12,7 @@ interface WorkHost extends TodoHost {
 }
 
 type WorkCommands = Readonly<Pick<ExtensionAPI, "registerCommand" | "registerShortcut">>;
-const protocolVersion = 2,
+const protocolVersion = 3,
   initialRevision = 0;
 
 interface WorkContext extends TodoContext {
