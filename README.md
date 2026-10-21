@@ -56,9 +56,8 @@ version. On main, the Publish workflow opens a "Version Packages" pull request. 
 trusted publishing.
 
 npm trusts the workflow only for a package that already exists. After the first release that includes a new package,
-its publish fails with 404. The npm owner then runs `scripts/npm-first-publish.sh packages/<name>` once from a clean
-main. The script publishes the package, trusts the Publish workflow, and re-runs it for the packages that depend on
-it.
+its publish fails with 404. The npm owner then runs `scripts/npm-first-publish.sh <name>` once. The script publishes
+origin/main's copy of the package, trusts the Publish workflow, and re-runs it for the packages that depend on it.
 
 ## License
 
