@@ -7,7 +7,8 @@ const TARGETS = ["proxy/gpt-first", "proxy/gpt-second", "proxy/claude-next", "pr
   THIRD = 2,
   COUNT = 3,
   LAST = -1,
-  BACKOFF = 2000;
+  BACKOFF = 2000,
+  UNLISTED = "proxy/gpt-first";
 
 describe("gateway and quota recovery", () => {
   it("opens a gateway circuit without cooling models", { timeout: 5000 }, async () => {
@@ -76,6 +77,37 @@ describe("terminal failures", () => {
     await test.dispatch("user", false);
     await expect(test.settle("HTTP 503")).resolves.toBe(false);
     expect(test.dispatched).toHaveLength(COUNT);
+  });
+});
+
+describe("unlisted targets", () => {
+  it("skips a model the registry does not list", { timeout: 5000 }, async () => {
+    expect.hasAssertions();
+    const test = new Harness(TARGETS);
+    test.unlisted = [UNLISTED];
+    await expect(test.dispatch()).resolves.toBe(TARGETS[SECOND]);
+    await expect(test.settle("You have hit your ChatGPT usage limit")).resolves.toBe(true);
+    await expect(test.dispatch("continuation")).resolves.toBe(TARGETS[THIRD]);
+    expect(test.health.circuits).toStrictEqual({});
+  });
+
+  it(
+    "leaves a persisted choice once its model is no longer listed",
+    { timeout: 5000 },
+    async () => {
+      expect.hasAssertions();
+      const test = new Harness(TARGETS);
+      await expect(test.dispatch()).resolves.toBe(UNLISTED);
+      test.unlisted = [UNLISTED];
+      await expect(test.dispatch("continuation")).resolves.toBe(TARGETS[SECOND]);
+    },
+  );
+
+  it("stops when no tier target is listed", { timeout: 5000 }, async () => {
+    expect.hasAssertions();
+    const test = new Harness(TARGETS);
+    test.unlisted = TARGETS;
+    await expect(test.dispatch()).rejects.toThrow("No available target in tier.");
   });
 });
 

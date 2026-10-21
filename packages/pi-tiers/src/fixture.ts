@@ -77,6 +77,7 @@ class Harness {
   public readonly abort = new AbortController();
   public health: Health = emptyHealth();
   public quota = "";
+  public unlisted: readonly string[] = [];
   public quotaReads = ZERO;
   public now = START;
   #state: State | undefined = undefined;
@@ -115,7 +116,12 @@ class Harness {
   public context(): Context {
     return {
       model: model("tier/test"),
-      modelRegistry: { getAvailable: () => this.targets.map((reference) => model(reference)) },
+      modelRegistry: {
+        getAvailable: () =>
+          this.targets
+            .filter((reference) => !this.unlisted.includes(reference))
+            .map((reference) => model(reference)),
+      },
       sessionManager: { getBranch: () => this.branch },
       signal: this.abort.signal,
     };

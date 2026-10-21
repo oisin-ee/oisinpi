@@ -9,6 +9,7 @@ import type { Context } from "./ports.ts";
 import type { Router } from "./router.ts";
 import type { Tiers } from "./config.ts";
 import { classify } from "./policy.ts";
+import { listed } from "./router.ts";
 
 const ZERO = 0,
   ONE = 1;
@@ -76,7 +77,8 @@ class Recovery {
     }
     const tier = ctx.model.id,
       state = branchState(ctx.sessionManager.getBranch(), tier),
-      targets = this.#tiers.get(tier),
+      tierTargets = this.#tiers.get(tier),
+      targets = tierTargets === undefined ? undefined : listed(tierTargets, ctx),
       message = event.context.contextMessages.findLast((item) => item.role === "assistant"),
       entry = event.context.contextEntries.findLast(
         (item: Readonly<{ sourceEntry: SessionEntry; messages: readonly unknown[] }>) =>
