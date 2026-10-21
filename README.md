@@ -55,6 +55,10 @@ Add a changeset with `pnpm exec changeset` in each pull request that changes a p
 version. On main, the Publish workflow opens a "Version Packages" pull request. Merging it publishes to npm with
 trusted publishing.
 
+npm trusts the workflow only for a package that already exists. After the first release that includes a new package,
+its publish fails with 404. The npm owner then runs `scripts/npm-first-publish.sh <name>` once. The script publishes
+origin/main's copy of the package, trusts the Publish workflow, and re-runs it for the packages that depend on it.
+
 ## License
 
 MIT
