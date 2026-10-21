@@ -1,5 +1,15 @@
 # @oisin-ee/oisinpi
 
+## 0.9.1
+
+### Patch Changes
+
+- Updated dependencies [[`bcba2d4`](https://github.com/oisin-ee/oisinpi/commit/bcba2d42673c2cf12c23b62079c2a96c0b098e30)]:
+  - @oisin-ee/pi-tiers@0.9.1
+  - @oisin-ee/pi-guardrails@0.9.1
+  - @oisin-ee/pi-prewalk@0.9.1
+  - @oisin-ee/pi-todo@0.9.1
+
 ## 0.9.0
 
 ### Minor Changes
