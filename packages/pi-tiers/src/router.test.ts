@@ -121,6 +121,22 @@ describe("unlisted targets", () => {
   });
 });
 
+describe("provider server errors", () => {
+  it(
+    "moves to the next target when one provider fails server-side",
+    { timeout: 5000 },
+    async () => {
+      expect.hasAssertions();
+      const test = new Harness(["proxy/minimax-m3.1-flash", "proxy/gpt-next"]);
+      await expect(test.dispatch()).resolves.toBe("proxy/minimax-m3.1-flash");
+      await expect(
+        test.settle("empty_stream: upstream stream closed before first payload"),
+      ).resolves.toBe(true);
+      await expect(test.dispatch("continuation")).resolves.toBe("proxy/gpt-next");
+    },
+  );
+});
+
 describe("quota preflight", () => {
   it(
     "skips exhausted snapshot pools before dispatch and caches the snapshot",
