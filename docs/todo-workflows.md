@@ -125,4 +125,4 @@ Legacy flat and hierarchical snapshots retain their recorded status and display.
 
 Exact-content selectors apply only before migration. Legacy `in_progress` does not authorize execution. Open legacy work requires `update`, then explicit `start`. An atomic `update` with `start` is also valid. Completed legacy work never reopens automatically.
 
-The shared presentation protocol remains version 2. Pi-todo shows assignment, profile, scope, revision, and parent review state. It stores no queue, host, pane, process, retry, or cancellation state.
+The shared presentation protocol is version 3: the version 2 envelope plus `display.sections`, four typed status groups (`in_progress`, `pending`, `completed`, `abandoned`) in that order. Pi-todo no longer answers version 2 requests; an incompatible presenter falls back to standalone todos. Pi-todo shows assignment, profile, scope, revision, and parent review state. It stores no queue, host, pane, process, retry, or cancellation state.

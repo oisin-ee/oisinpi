@@ -4,6 +4,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { Mock } from "vitest";
 import { TodoPresentation } from "./presentation.ts";
 import { TodoWork } from "./work.ts";
+import { sections } from "./wasm.ts";
 
 type Listener = (value: unknown) => void;
 interface Fixture {
@@ -74,7 +75,7 @@ const firstArgument = 0,
       work = new TodoWork(host, new TodoPresentation()),
       snapshot = vi.fn<Listener>(),
       opened = vi.fn<Listener>(),
-      envelope = { presenter: "work", request: "request", version: 2 };
+      envelope = { presenter: "work", request: "request", version: 3 };
     events.on("oisin.todo.snapshot", snapshot);
     events.on("oisin.work.open", opened);
     return {
@@ -106,7 +107,7 @@ describe("work provider", () => {
         branch: null,
         revision: 1,
         session: "session",
-        version: 2,
+        version: 3,
       }),
     );
     expect(test.ctx.ui.setWidget).not.toHaveBeenCalled();
@@ -123,7 +124,7 @@ describe("work provider", () => {
     expect(test.opened).toHaveBeenCalledExactlyOnceWith({
       presenter: "work",
       request: "request",
-      version: 2,
+      version: 3,
       view: "todos",
     });
     test.release();
@@ -136,11 +137,35 @@ describe("work provider", () => {
     const test = fixture();
     test.work.start(test.ctx);
     test.request();
-    test.claim({ presenter: "old", request: "old", version: 2 });
+    test.claim({ presenter: "old", request: "old", version: 3 });
     expect(test.work.open()).toBe(false);
     test.work.stop();
     test.request();
     expect(test.snapshot).toHaveBeenCalledTimes(oneCall);
+  });
+});
+
+describe("work protocol v3", () => {
+  it("publishes core-owned sections in the snapshot", { timeout: 5000 }, () => {
+    expect.hasAssertions();
+    const test = fixture();
+    test.work.start(test.ctx);
+    test.request();
+    expect(test.snapshot).toHaveBeenCalledTimes(oneCall);
+    expect(test.snapshot.mock.lastCall?.at(firstArgument)).toMatchObject({
+      display: { sections: sections({ tasks: [] }) },
+      version: 3,
+    });
+    test.work.stop();
+  });
+
+  it("rejects a v2 request like any incompatible version", { timeout: 5000 }, () => {
+    expect.hasAssertions();
+    const test = fixture();
+    test.work.start(test.ctx);
+    test.events.emit("oisin.work.request", { presenter: "work", request: "request", version: 2 });
+    expect(test.snapshot).not.toHaveBeenCalled();
+    test.work.stop();
   });
 });
 

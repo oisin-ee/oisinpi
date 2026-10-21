@@ -89,8 +89,10 @@ Alt+J/K scrolls the hosted rows. Alt+I toggles their expansion. Ordinary editor 
 `/todos` and Alt+T request the shared Todos view. `/todos list` still prints the full list.
 When shared presentation ends, the standalone widget returns without changing task state.
 
-The [version 2 display contract](https://github.com/oisin-ee/dogsled/blob/main/docs/pi-work.md)
+The [version 3 display contract](https://github.com/oisin-ee/dogsled/blob/main/docs/pi-work.md)
 defines the snapshot request, acknowledgement, release, and read-only view events.
+Version 3 adds `display.sections` to the snapshot: four typed status groups (`in_progress`, `pending`, `completed`, `abandoned`), always present and in that order, each with a count and its items. Each item carries its text, review flag, contract summary, and all subtasks. The core owns this grouping; a presenter only draws it.
+Pi-todo does not answer version 2 requests.
 Incompatible versions leave the standalone widget available. Rendering failures restore it without changing saved tasks.
 
 ## Plannotator plans

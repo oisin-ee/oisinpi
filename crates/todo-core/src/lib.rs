@@ -34,7 +34,7 @@ pub use provider::{
     claim, inspect, parse_claim, parse_settlement, protect, settle,
 };
 pub use reminder::{ReminderFact, ReminderHistory, completion_reminder};
-pub use widget::{WidgetKind, WidgetRow, widget};
+pub use widget::{SectionChild, SectionItem, TodoSection, WidgetKind, WidgetRow, sections, widget};
 
 use serde::{Deserialize, Serialize};
 use std::fmt;

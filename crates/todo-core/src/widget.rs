@@ -25,57 +25,129 @@ pub struct WidgetRow {
     pub text: String,
 }
 
-fn group(list: &TodoList, status: Status, expanded: bool, rows: &mut Vec<WidgetRow>) {
-    let tasks: Vec<_> = list
-        .tasks
-        .iter()
-        .filter(|task| task.status == status)
-        .collect();
-    if tasks.is_empty() {
+/// One subtask of a section item, with its contract summary.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
+pub struct SectionChild {
+    pub status: Status,
+    pub text: String,
+    pub unit: Option<String>,
+}
+
+/// One top-level task of a section, with every subtask.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
+pub struct SectionItem {
+    pub status: Status,
+    pub text: String,
+    pub review: bool,
+    pub unit: Option<String>,
+    pub children: Vec<SectionChild>,
+}
+
+/// The tasks of one status, in list order.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
+pub struct TodoSection {
+    pub status: Status,
+    pub count: usize,
+    pub items: Vec<SectionItem>,
+}
+
+/// The section order. Presenters rely on it; `widget` reads the active section first.
+const ORDER: [Status; 4] = [
+    Status::InProgress,
+    Status::Pending,
+    Status::Completed,
+    Status::Abandoned,
+];
+
+/// Groups tasks by status: always four sections, in `ORDER`, empty ones included.
+#[must_use]
+pub fn sections(list: &TodoList) -> Vec<TodoSection> {
+    ORDER
+        .into_iter()
+        .map(|status| {
+            let items: Vec<_> = list
+                .tasks
+                .iter()
+                .filter(|task| task.status == status)
+                .map(|task| SectionItem {
+                    status: task.status,
+                    text: task.content.clone(),
+                    review: task.ready_for_review(),
+                    unit: task.unit.as_ref().map(crate::Unit::summary),
+                    children: task
+                        .subtasks
+                        .iter()
+                        .map(|child| SectionChild {
+                            status: child.status,
+                            text: child.content.clone(),
+                            unit: child.unit.as_ref().map(crate::Unit::summary),
+                        })
+                        .collect(),
+                })
+                .collect();
+            TodoSection {
+                status,
+                count: items.len(),
+                items,
+            }
+        })
+        .collect()
+}
+
+const fn style(status: Status) -> (&'static str, WidgetKind) {
+    match status {
+        Status::Pending => ("○", WidgetKind::Upcoming),
+        Status::InProgress => ("●", WidgetKind::Active),
+        Status::Completed => ("✓", WidgetKind::Done),
+        Status::Abandoned => ("−", WidgetKind::Dropped),
+    }
+}
+
+fn group(section: &TodoSection, expanded: bool, rows: &mut Vec<WidgetRow>) {
+    if section.items.is_empty() {
         return;
     }
-    let (label, mark, kind) = match status {
-        Status::InProgress => ("In progress", "●", WidgetKind::Active),
-        Status::Pending => ("Upcoming", "○", WidgetKind::Upcoming),
-        Status::Completed => ("Done", "✓", WidgetKind::Done),
-        Status::Abandoned => ("Dropped", "−", WidgetKind::Dropped),
+    let label = match section.status {
+        Status::InProgress => "In progress",
+        Status::Pending => "Upcoming",
+        Status::Completed => "Done",
+        Status::Abandoned => "Dropped",
     };
+    let (mark, kind) = style(section.status);
     rows.push(WidgetRow {
         kind: WidgetKind::Heading,
-        text: format!("{label} · {}", tasks.len()),
+        text: format!("{label} · {}", section.count),
     });
-    for task in tasks {
-        let review = if task.ready_for_review() {
+    for item in &section.items {
+        let review = if item.review {
             " · Ready for review"
         } else {
             ""
         };
         rows.push(WidgetRow {
             kind,
-            text: format!("{mark} {}{review}", task.content),
+            text: format!("{mark} {}{review}", item.text),
         });
-        if let Some(unit) = &task.unit {
+        if let Some(unit) = &item.unit {
             rows.push(WidgetRow {
                 kind: WidgetKind::Summary,
-                text: format!("  {}", unit.summary()),
+                text: format!("  {unit}"),
             });
         }
         rows.extend(
-            task.subtasks
+            item.children
                 .iter()
                 .filter(|child| expanded || child.status == Status::InProgress)
                 .map(|child| {
-                    let (mark, kind) = match child.status {
-                        Status::Pending => ("○", WidgetKind::Upcoming),
-                        Status::InProgress => ("●", WidgetKind::Active),
-                        Status::Completed => ("✓", WidgetKind::Done),
-                        Status::Abandoned => ("−", WidgetKind::Dropped),
-                    };
+                    let (mark, kind) = style(child.status);
                     WidgetRow {
                         kind,
                         text: child.unit.as_ref().map_or_else(
-                            || format!("  {mark} {}", child.content),
-                            |unit| format!("  {mark} {} · {}", child.content, unit.summary()),
+                            || format!("  {mark} {}", child.text),
+                            |unit| format!("  {mark} {} · {unit}", child.text),
                         ),
                     }
                 }),
@@ -89,8 +161,11 @@ pub fn widget(list: &TodoList, expanded: bool) -> Option<Vec<WidgetRow>> {
     if list.tasks.is_empty() {
         return None;
     }
+    let mut sections = sections(list).into_iter();
     let mut rows = Vec::new();
-    group(list, Status::InProgress, expanded, &mut rows);
+    if let Some(active) = sections.next() {
+        group(&active, expanded, &mut rows);
+    }
     if rows.is_empty() {
         rows.push(WidgetRow {
             kind: WidgetKind::Summary,
@@ -98,8 +173,8 @@ pub fn widget(list: &TodoList, expanded: bool) -> Option<Vec<WidgetRow>> {
         });
     }
     if expanded {
-        for status in [Status::Pending, Status::Completed, Status::Abandoned] {
-            group(list, status, expanded, &mut rows);
+        for section in sections {
+            group(&section, expanded, &mut rows);
         }
     }
     Some(rows)
@@ -108,7 +183,7 @@ pub fn widget(list: &TodoList, expanded: bool) -> Option<Vec<WidgetRow>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Task;
+    use crate::{ContractDraft, MutationContext, Subtask, Task, Unit};
 
     fn list() -> TodoList {
         TodoList {
@@ -193,5 +268,95 @@ mod tests {
             }]
         );
         assert_eq!(widget(&list, true).unwrap().len(), 3);
+    }
+
+    #[test]
+    fn sections_are_four_status_groups_in_fixed_order() {
+        let context = MutationContext {
+            session_id: "s".to_owned(),
+            mutation_id: "m".to_owned(),
+        };
+        let unit = |index| Unit::new(&context, index, ContractDraft::default());
+        let mut list = list();
+        list.tasks[1].unit = Some(unit(0));
+        list.tasks[1].subtasks = vec![
+            Subtask {
+                content: "Measure".to_owned(),
+                status: Status::Completed,
+                unit: Some(unit(1)),
+            },
+            Subtask {
+                content: "Skip".to_owned(),
+                status: Status::Abandoned,
+                unit: None,
+            },
+        ];
+        let sections = sections(&list);
+        let shape: Vec<_> = sections
+            .iter()
+            .map(|section| {
+                (
+                    section.status,
+                    section.count,
+                    section
+                        .items
+                        .iter()
+                        .map(|item| item.text.as_str())
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            shape,
+            [
+                (Status::InProgress, 1, vec!["Build the widget"]),
+                (
+                    Status::Pending,
+                    2,
+                    vec!["Check the layout", "Ship the change"]
+                ),
+                (Status::Completed, 1, vec!["Earlier work"]),
+                (Status::Abandoned, 1, vec!["Old approach"]),
+            ]
+        );
+        assert_eq!(
+            sections[0].items[0],
+            SectionItem {
+                status: Status::InProgress,
+                text: "Build the widget".to_owned(),
+                review: true,
+                unit: Some("u-m-0 r1 · draft · assignment missing · scope missing".to_owned()),
+                children: vec![
+                    SectionChild {
+                        status: Status::Completed,
+                        text: "Measure".to_owned(),
+                        unit: Some(
+                            "u-m-1 r1 · draft · assignment missing · scope missing".to_owned()
+                        ),
+                    },
+                    SectionChild {
+                        status: Status::Abandoned,
+                        text: "Skip".to_owned(),
+                        unit: None,
+                    },
+                ],
+            },
+            "children are complete, not filtered by expansion"
+        );
+        assert!(!sections[1].items[0].review, "no children, no review");
+        assert_eq!(sections[1].items[0].unit, None);
+    }
+
+    #[test]
+    fn sections_of_an_empty_list_are_four_empty_groups() {
+        let sections = sections(&TodoList::default());
+        assert_eq!(
+            sections,
+            ORDER.map(|status| TodoSection {
+                status,
+                count: 0,
+                items: vec![],
+            })
+        );
     }
 }
