@@ -53,10 +53,15 @@ describe("error policy", () => {
 
   it("maps pools and rejects malformed config", { timeout: 5000 }, () => {
     expect.hasAssertions();
-    expect(target("proxy/claude-opus").pool).toBe("claude");
-    expect(target("proxy/gpt-worker").pool).toBe("codex");
-    expect(target("proxy/minimax-m3").pool).toBe("minimax");
-    expect(target("other/model").pool).toBe("other");
+    expect(
+      [
+        "proxy/claude-opus",
+        "proxy/gpt-worker",
+        "proxy/minimax-m3",
+        "proxy/MiniMax-M3.1-Flash",
+        "other/model",
+      ].map((reference) => target(reference).pool),
+    ).toStrictEqual(["claude", "codex", "minimax", "minimax", "other"]);
     expect(() => parseConfig('{"fast":["unknown"]}')).toThrow("Invalid tier target");
   });
 });
