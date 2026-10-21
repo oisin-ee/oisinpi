@@ -77,7 +77,9 @@ const ZERO = 0,
         ["minimax-", "minimax"],
       ],
       pool =
-        pools.find(([prefix]: readonly string[]) => id.startsWith(prefix ?? ""))?.[ONE] ?? provider;
+        pools.find(([prefix]: readonly string[]) => id.toLowerCase().startsWith(prefix ?? ""))?.[
+          ONE
+        ] ?? provider;
     return { id, pool, provider };
   };
 

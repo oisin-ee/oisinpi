@@ -103,6 +103,16 @@ describe("unlisted targets", () => {
     },
   );
 
+  it("dispatches the registry's id when only the case differs", { timeout: 5000 }, async () => {
+    expect.hasAssertions();
+    const test = new Harness(["proxy/minimax-m3.1-flash", "proxy/gpt-next"]);
+    test.registry = ["proxy/MiniMax-M3.1-Flash", "proxy/gpt-next"];
+    await expect(test.dispatch()).resolves.toBe("proxy/MiniMax-M3.1-Flash");
+    await expect(test.settle("HTTP 429 rate_limit")).resolves.toBe(true);
+    expect(test.health.pools["minimax"]?.until).toBeGreaterThan(test.now);
+    await expect(test.dispatch("continuation")).resolves.toBe("proxy/gpt-next");
+  });
+
   it("stops when no tier target is listed", { timeout: 5000 }, async () => {
     expect.hasAssertions();
     const test = new Harness(TARGETS);

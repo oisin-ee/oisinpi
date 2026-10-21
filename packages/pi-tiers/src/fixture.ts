@@ -78,6 +78,7 @@ class Harness {
   public health: Health = emptyHealth();
   public quota = "";
   public unlisted: readonly string[] = [];
+  public registry: readonly string[] | undefined = undefined;
   public quotaReads = ZERO;
   public now = START;
   #state: State | undefined = undefined;
@@ -118,7 +119,7 @@ class Harness {
       model: model("tier/test"),
       modelRegistry: {
         getAvailable: () =>
-          this.targets
+          (this.registry ?? this.targets)
             .filter((reference) => !this.unlisted.includes(reference))
             .map((reference) => model(reference)),
       },

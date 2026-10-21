@@ -12,19 +12,25 @@ const ZERO = 0,
   ONE = 1,
   CACHE_MS = 60_000,
   /**
-   * Keeps only targets the model registry lists, so a provider model that is not
-   * configured yet behaves like an unavailable target instead of a terminal error.
+   * Resolves tier targets to the references the model registry lists. Provider model
+   * ids differ in case from the tier file (`MiniMax-M3.1-Flash`), so matching ignores
+   * case and returns the registry's exact reference. A target that is not listed yet
+   * behaves like an unavailable target instead of a terminal error.
    * @param {readonly string[]} targets Ordered tier.
    * @param {Context} ctx Pi authority.
-   * @returns {readonly string[]} Listed targets, in tier order.
+   * @returns {readonly string[]} Listed registry references, in tier order.
    */
   listed = (targets: readonly string[], ctx: Context): readonly string[] => {
-    const available = new Set(
-      ctx.modelRegistry.getAvailable().map((candidate) => `${candidate.provider}/${candidate.id}`),
+    const available = new Map(
+      ctx.modelRegistry.getAvailable().map((candidate) => {
+        const reference = `${candidate.provider}/${candidate.id}`;
+        return [reference.toLowerCase(), reference];
+      }),
     );
-    return targets.filter((reference) => {
-      const parsed = target(reference);
-      return available.has(`${parsed.provider}/${parsed.id}`);
+    return targets.flatMap((reference) => {
+      const parsed = target(reference),
+        found = available.get(`${parsed.provider}/${parsed.id}`.toLowerCase());
+      return found === undefined ? [] : [found];
     });
   };
 
