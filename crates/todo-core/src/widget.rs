@@ -272,26 +272,7 @@ mod tests {
 
     #[test]
     fn sections_are_four_status_groups_in_fixed_order() {
-        let context = MutationContext {
-            session_id: "s".to_owned(),
-            mutation_id: "m".to_owned(),
-        };
-        let unit = |index| Unit::new(&context, index, ContractDraft::default());
-        let mut list = list();
-        list.tasks[1].unit = Some(unit(0));
-        list.tasks[1].subtasks = vec![
-            Subtask {
-                content: "Measure".to_owned(),
-                status: Status::Completed,
-                unit: Some(unit(1)),
-            },
-            Subtask {
-                content: "Skip".to_owned(),
-                status: Status::Abandoned,
-                unit: None,
-            },
-        ];
-        let sections = sections(&list);
+        let sections = sections(&list());
         let shape: Vec<_> = sections
             .iter()
             .map(|section| {
@@ -319,6 +300,30 @@ mod tests {
                 (Status::Abandoned, 1, vec!["Old approach"]),
             ]
         );
+    }
+
+    #[test]
+    fn section_items_carry_review_unit_and_every_child() {
+        let context = MutationContext {
+            session_id: "s".to_owned(),
+            mutation_id: "m".to_owned(),
+        };
+        let unit = |index| Unit::new(&context, index, ContractDraft::default());
+        let mut list = list();
+        list.tasks[1].unit = Some(unit(0));
+        list.tasks[1].subtasks = vec![
+            Subtask {
+                content: "Measure".to_owned(),
+                status: Status::Completed,
+                unit: Some(unit(1)),
+            },
+            Subtask {
+                content: "Skip".to_owned(),
+                status: Status::Abandoned,
+                unit: None,
+            },
+        ];
+        let sections = sections(&list);
         assert_eq!(
             sections[0].items[0],
             SectionItem {
