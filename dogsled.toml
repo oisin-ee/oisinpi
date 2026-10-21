@@ -1,0 +1,4 @@
+# Dogsled worktree setup. Proto loads repository plugins (wasm-bindgen, shfmt) only from
+# trusted `.prototools` files, and trust is per path, so each new worktree needs it.
+[worktree]
+setup = ["proto trust .prototools"]
