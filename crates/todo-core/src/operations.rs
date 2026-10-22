@@ -397,11 +397,16 @@ fn close_leaf(
     if !status.is_open() {
         return Ok(());
     }
+    if unit.as_ref().is_some_and(|unit| unit.binding.is_some()) && request.task.is_none() {
+        return Err(error(
+            "UNIT_ALREADY_BOUND: close a held worker unit by its explicit ID",
+        ));
+    }
     if matches!(request.op, Operation::Done) {
         let evidence = request
             .evidence
             .as_ref()
-            .ok_or_else(|| error("ACCEPTANCE_REQUIRED: done needs concrete acceptance evidence"))?;
+            .ok_or_else(|| error("ACCEPTANCE_REQUIRED: done needs a short note"))?;
         nonempty(evidence)?;
         if let Some(unit) = unit {
             unit.acceptance_evidence = Some(evidence.clone());
@@ -412,6 +417,9 @@ fn close_leaf(
     }
     if let Some(unit) = unit {
         unit.local_session_id = None;
+        if let Some(binding) = unit.binding.take() {
+            unit.released.push(binding.execution);
+        }
         if let Some(imported) = &mut unit.imported {
             imported.seal = Some(crate::Seal {
                 entry_id: String::new(),
@@ -436,11 +444,7 @@ fn close_root(task: &mut Task, request: &Request) -> Result<(), TodoError> {
     close_leaf(&mut task.status, &mut task.unit, request)
 }
 
-fn completion(
-    list: &mut TodoList,
-    request: &Request,
-    context: &MutationContext,
-) -> Result<(), TodoError> {
+fn completion(list: &mut TodoList, request: &Request) -> Result<(), TodoError> {
     if !matches!(request.op, Operation::Done) {
         return Ok(());
     }
@@ -461,23 +465,12 @@ fn completion(
         .as_ref()
         .ok_or_else(|| error("CONTRACT_INCOMPLETE: update legacy work before completion"))?;
     unit.contract(title)?;
-    if unit.local_session_id.as_deref() != Some(&context.session_id)
-        && !crate::provider::has_review_evidence(unit)
-    {
-        return Err(error(
-            "ACCEPTANCE_REQUIRED: start local work or obtain released worker evidence before completion",
-        ));
-    }
     let unit = unit.clone();
     crate::validation::prerequisites(list, &unit)
 }
 
-fn close(
-    list: &mut TodoList,
-    request: &Request,
-    context: &MutationContext,
-) -> Result<(), TodoError> {
-    completion(list, request, context)?;
+fn close(list: &mut TodoList, request: &Request) -> Result<(), TodoError> {
+    completion(list, request)?;
     if let Some(selector) = &request.task {
         if request.parent.is_none()
             && list
@@ -506,6 +499,25 @@ fn close(
         }
         Ok(())
     }
+}
+
+/// A bound unit is protected unless this request closed it and recorded its release.
+fn held_units(previous: &TodoList, list: &TodoList) -> Vec<crate::UnitRef> {
+    let after = crate::validation::units(list);
+    crate::validation::units(previous)
+        .into_iter()
+        .filter(|(unit, _, _)| {
+            unit.binding.as_ref().is_some_and(|binding| {
+                !after.iter().any(|(next, status, _)| {
+                    next.reference == unit.reference
+                        && !status.is_open()
+                        && next.binding.is_none()
+                        && next.released.last() == Some(&binding.execution)
+                })
+            })
+        })
+        .map(|(unit, _, _)| unit.reference.clone())
+        .collect()
 }
 
 /// Applies one atomic request using identity supplied by the trusted runtime.
@@ -552,7 +564,7 @@ pub fn apply(
             HashMap::new()
         }
         Operation::Done | Operation::Drop => {
-            close(&mut list, &request, context)?;
+            close(&mut list, &request)?;
             HashMap::new()
         }
         Operation::View => HashMap::new(),
@@ -563,11 +575,7 @@ pub fn apply(
         request.parent = None;
         start(&mut list, &request, context)?;
     }
-    let held = crate::validation::units(&previous)
-        .into_iter()
-        .filter(|(unit, _, _)| unit.binding.is_some())
-        .map(|(unit, _, _)| unit.reference.clone())
-        .collect::<Vec<_>>();
+    let held = held_units(&previous, &list);
     crate::provider::protect(&previous, &list, &held)?;
     validate(&list)?;
     Ok(Change {

@@ -168,6 +168,7 @@ pub fn import_unit(
             local_session_id: session_id.to_owned(),
             seal: None,
         }),
+        released: vec![],
     };
     let list = TodoList {
         tasks: vec![Task {

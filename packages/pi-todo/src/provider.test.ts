@@ -55,9 +55,9 @@ describe("provider acceptance", () => {
         version: 1,
       };
     try {
-      await expect(fixture.test.todo({ op: "drop", task: fixture.id })).rejects.toThrow(
-        "UNIT_ALREADY_BOUND",
-      );
+      await expect(
+        fixture.test.todo({ contract: contract(), op: "update", task: fixture.id }),
+      ).rejects.toThrow("UNIT_ALREADY_BOUND");
       expect(provider.settle(settlement)).toStrictEqual({ ok: true, value: { applied: true } });
       expect(provider.settle(settlement)).toStrictEqual({ ok: true, value: { applied: false } });
       expect(branchSnapshot(fixture.test.manager.getBranch()).tasks.at(first)?.status).toBe(
@@ -103,6 +103,71 @@ describe("provider scope and origin", () => {
       expect(
         branchSnapshot(fixture.test.manager.getBranch()).tasks.at(first)?.unit?.binding,
       ).toStrictEqual(fixture.claimed.binding);
+    } finally {
+      fixture.test.session.dispose();
+    }
+  });
+});
+
+/**
+ * Closes a held worker as the lead, then replays its late settlement.
+ * @param {Function} close Builds the closing todo request for a unit ID.
+ */
+type Closing = (
+  id: string,
+) => Parameters<Awaited<ReturnType<typeof worker>>["test"]["todo"]>[typeof first];
+const closeHeld = async (close: Closing): Promise<void> => {
+  const fixture = await worker(),
+    { binding } = fixture.claimed,
+    count = (): number => fixture.test.manager.getBranch().length,
+    settlement = {
+      binding,
+      eventId: "late",
+      result: {
+        evidence: { execution: binding.execution, resultId: "reply", summary: "late" },
+        kind: "returned",
+      },
+      version: 1,
+    };
+  try {
+    await fixture.test.todo(close(fixture.id));
+    const unit = branchSnapshot(fixture.test.manager.getBranch()).tasks.at(first)?.unit,
+      before = count();
+    expect(unit?.binding).toBeUndefined();
+    expect(unit?.released).toStrictEqual([binding.execution]);
+    expect(fixture.test.provider().settle(settlement)).toStrictEqual({
+      ok: true,
+      value: { applied: false },
+    });
+    expect(count()).toBe(before);
+    await fixture.test.todo({
+      items: [{ content: "Local", contract: contract(), key: "local" }],
+      op: "append",
+      start: "local",
+    });
+  } finally {
+    fixture.test.session.dispose();
+  }
+};
+
+describe("lead closes a held worker", () => {
+  it("done releases the binding and late settlements are no-ops", { timeout: 20_000 }, async () => {
+    expect.hasAssertions();
+    await closeHeld((task) => ({ evidence: "merged", op: "done", task }));
+  });
+
+  it("drop releases the binding and late settlements are no-ops", { timeout: 20_000 }, async () => {
+    expect.hasAssertions();
+    await closeHeld((task) => ({ op: "drop", task }));
+  });
+
+  it("done needs a note", { timeout: 20_000 }, async () => {
+    expect.hasAssertions();
+    const fixture = await worker();
+    try {
+      await expect(fixture.test.todo({ op: "done", task: fixture.id })).rejects.toThrow(
+        "ACCEPTANCE_REQUIRED",
+      );
     } finally {
       fixture.test.session.dispose();
     }
