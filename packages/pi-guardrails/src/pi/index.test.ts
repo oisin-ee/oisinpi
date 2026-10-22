@@ -389,3 +389,143 @@ test("pi leaves a non-planning model free to write and run commands", async () =
     assert.equal(result, undefined, JSON.stringify(context));
   }
 });
+
+const PLANNER = { cwd: "/repo", model: { provider: "tier", id: "plan-claude" } };
+
+test("pi blocks a planning model that uses a tool name it only resembles", async () => {
+  const pi = fakePi();
+  install(pi);
+  for (const [toolName, input] of [
+    ["dangerous_read", { path: "/repo/a.ts" }],
+    ["mcp__untrusted__read", { path: "/repo/a.ts" }],
+    ["mcp__untrusted__codemode", { code: "print(1)", language: "python" }],
+    ["mcp__untrusted__bash", { command: "ls" }],
+  ] as [string, Record<string, unknown>][]) {
+    const result = await pi.trigger("tool_call", { input, toolName }, PLANNER);
+    assert.equal(result?.block, true, toolName);
+    assert.match(result?.reason ?? "", /^planning-readonly:/u, toolName);
+  }
+});
+
+test("pi blocks a planning model that hides a write in shell syntax", async () => {
+  const pi = fakePi();
+  install(pi);
+  for (const command of [
+    "find . $'-delete'",
+    "rg $'--pre=./evil' pattern .",
+    "./ls",
+    "/repo/tools/git status",
+    "ls@evil",
+    "git diff -- --no-ext-diff --no-textconv",
+    "rg --max-count",
+  ]) {
+    const result = await pi.trigger("tool_call", { input: { command }, toolName: "bash" }, PLANNER);
+    assert.equal(result?.block, true, command);
+    assert.match(result?.reason ?? "", /^planning-readonly:/u, command);
+  }
+});
+
+test("pi blocks a planning model that hides a write in a raw command", async () => {
+  const pi = fakePi();
+  install(pi);
+  const result = await pi.trigger(
+    "tool_call",
+    { input: { command: 'find . -name "* -o -delete -name *', raw: true }, toolName: "hypa_shell" },
+    PLANNER,
+  );
+  assert.equal(result?.block, true);
+  assert.match(result?.reason ?? "", /^planning-readonly:/u);
+});
+
+test("pi blocks a planning model whose batch holds one bad command", async () => {
+  const pi = fakePi();
+  install(pi);
+  for (const commands of [[{ command: "ls" }, { command: "rm x" }], ["ls"], [{ label: "x" }]]) {
+    const result = await pi.trigger(
+      "tool_call",
+      { input: { commands }, toolName: "ctx_batch_execute" },
+      PLANNER,
+    );
+    assert.equal(result?.block, true, JSON.stringify(commands));
+    assert.match(result?.reason ?? "", /^planning-readonly:/u);
+  }
+});
+
+test("pi blocks a planning model whose nested call cannot be inspected", async () => {
+  const pi = fakePi();
+  install(pi);
+  for (const input of [
+    { code: "print(1)", language: "python", tool_uses: [{ parameters: {} }] },
+    { code: "print(1)", language: "python", tool_uses: [{ parameters: {}, recipient_name: "" }] },
+    { code: "print(1)", language: "python", tool_uses: "bash" },
+    {
+      code: "print(1)",
+      language: "python",
+      tool_uses: [{ parameters: "x", recipient_name: "read" }],
+    },
+  ]) {
+    const result = await pi.trigger("tool_call", { input, toolName: "codemode" }, PLANNER);
+    assert.equal(result?.block, true, JSON.stringify(input));
+    assert.match(result?.reason ?? "", /^planning-readonly:/u);
+  }
+});
+
+test("pi blocks a planning model whose nested call nests too deep", async () => {
+  const pi = fakePi();
+  install(pi);
+  let input: Record<string, unknown> = { path: "/repo/a.ts" };
+  for (let depth = 0; depth < 12; depth += 1) {
+    input = { code: "print(1)", language: "python", tool_uses: [input] };
+  }
+  const result = await pi.trigger("tool_call", { input, toolName: "codemode" }, PLANNER);
+  assert.equal(result?.block, true);
+  assert.match(result?.reason ?? "", /^planning-readonly:/u);
+});
+
+test("pi allows a planning model to read and blocks a non-planning model from nothing", async () => {
+  const pi = fakePi();
+  install(pi);
+  for (const [toolName, input] of [
+    ["read", { path: "/repo/a.ts" }],
+    ["grep", { pattern: "x" }],
+    ["bash", { command: "ls" }],
+    ["bash", { command: "git status" }],
+    ["bash", { command: "ls --color=never" }],
+    ["hypa_shell", { command: "ls", raw: true }],
+    ["todo", { items: [] }],
+  ] as [string, Record<string, unknown>][]) {
+    const result = await pi.trigger("tool_call", { input, toolName }, PLANNER);
+    assert.equal(result, undefined, `${toolName} ${JSON.stringify(input)}`);
+  }
+});
+
+test("pi blocks a planning model whose shell command cannot be parsed", async () => {
+  const pi = fakePi();
+  install(pi);
+  const result = await pi.trigger(
+    "tool_call",
+    { input: { command: "ls 'broken" }, toolName: "bash" },
+    PLANNER,
+  );
+  assert.equal(result?.block, true);
+  assert.match(result?.reason ?? "", /shell-parser:/u);
+});
+
+test("pi follows the model of each call when the session switches", async () => {
+  const pi = fakePi();
+  install(pi);
+  const writer = { cwd: "/repo", model: { provider: "tier", id: "worker-gpt" } };
+  const planner = { cwd: "/repo", model: { provider: "tier", id: "plan-gpt" } };
+  const blocked = await pi.trigger(
+    "tool_call",
+    { input: { command: "rm x" }, toolName: "bash" },
+    planner,
+  );
+  assert.equal(blocked?.block, true);
+  const allowed = await pi.trigger(
+    "tool_call",
+    { input: { command: "rm x" }, toolName: "bash" },
+    writer,
+  );
+  assert.equal(allowed, undefined);
+});

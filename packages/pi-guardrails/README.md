@@ -28,9 +28,25 @@ A planning model may call:
 - a shell read: `pwd`, `ls`, `rg`, `grep`, `find` without `-exec`, `-delete`, or `-fprint`, and `git status`,
   `git diff`, `git log`, `git show`, and `git rev-parse` with read-only options.
 
-The shell check uses the `shfmt` syntax tree, so a redirect, an assignment, a substitution, a glob, or a
-background call is blocked even when the command itself reads. `git diff`, `git log -p`, and `git show`
-must carry `--no-ext-diff --no-textconv`, because a diff driver or a textconv filter can run a program.
+Every trusted name is exact. A tool whose name only resembles a trusted one, such as `dangerous_read` or
+`mcp__untrusted__read`, is blocked. The same holds for a command: only `pwd`, `ls`, `rg`, `grep`, `find`,
+and `git` are reads, so `./ls` and `/repo/tools/git status` are blocked.
+
+The shell check uses the `shfmt` syntax tree, so a redirect, an assignment, a substitution, a glob, a
+dollar-quoted word, or a background call is blocked even when the command itself reads. `git diff`,
+`git log -p`, and `git show` must carry `--no-ext-diff --no-textconv`, because a diff driver or a
+textconv filter can run a program. A word after `--` is a path, so it cannot carry those flags.
+
+Each command has its own option grammar. An option that needs a value must have one, an option that
+accepts only some values accepts only those, and a `find` option that changes the filesystem is blocked.
+
+A `hypa_shell` call with `raw: true` runs without a shell, so the runner splits the command on
+whitespace. The policy classifies those words, so a flag hidden in a quoted argument cannot slip through.
+
+Every command of a `ctx_batch_execute` call is checked on its own. A malformed entry is blocked.
+
+A nested call that the policy cannot inspect, such as a malformed codemode envelope or a call deeper
+than eight levels, is blocked for a planning model.
 
 Every other tool, including `write`, `edit`, and any command that changes the repository or the system,
 is blocked for a planning model. Other models keep the full policy set.

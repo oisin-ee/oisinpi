@@ -172,6 +172,29 @@ const MAX_BUFFER = 16 * 1024 * 1024,
     parsedOf(command).guards.map((stages) => stages?.map((words) => [...words]) ?? null);
 
 /**
+ * Whether a literal contains a glob character that the shell would expand. An
+ * escaped character is literal, so it does not expand.
+ * @param {string} value The raw literal text.
+ * @returns {boolean} True for an active glob character.
+ */
+function hasActiveGlob(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index] ?? "";
+    if (!"*?[]{}".includes(character)) {
+      continue;
+    }
+    let backslashes = 0;
+    for (let before = index - 1; before >= 0 && value[before] === "\\"; before -= 1) {
+      backslashes += 1;
+    }
+    if (backslashes % 2 === 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Returns literal calls only when the complete AST has read-only shell syntax.
  * @param {string} command Shell text.
  * @returns {string[][] | null} Literal argv, or null for unsupported syntax.
@@ -199,12 +222,13 @@ function literalShellCalls(command: string): string[][] | null {
         return false;
       }
       if (
+        node.Dollar === true ||
         node.Background === true ||
         (node.Redirs ?? []).length > 0 ||
         (node.Assigns ?? []).length > 0 ||
         (node.Type === "CallExpr" && (node.Args ?? []).length === 0) ||
         (node.Type === "BinaryCmd" && !["&&", "||", "|"].includes(node.Op ?? "")) ||
-        (node.Type === "Lit" && !quoted && /[*?[\]{}]/u.test(node.Value ?? "")) ||
+        (node.Type === "Lit" && !quoted && hasActiveGlob(node.Value ?? "")) ||
         (node.Type === "Lit" && !quoted && (node.Value ?? "").startsWith("~"))
       ) {
         return false;

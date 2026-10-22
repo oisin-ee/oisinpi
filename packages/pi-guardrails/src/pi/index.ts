@@ -56,15 +56,44 @@ const MAX_NESTING = 8,
     ),
   editViolation = (call: ToolCall, cwd: string): string | null =>
     classifyEdits(editInputsFromPayload({ tool_input: call.input, tool_name: call.toolName }), cwd),
-  nestedCalls = (input: Readonly<Record<string, unknown>>): ToolCall[] => {
+  /**
+   * The nested calls of a codemode input. A malformed envelope is a failure
+   * for a planning model, so it is reported rather than skipped.
+   * @param {Readonly<Record<string, unknown>>} input The tool input.
+   * @returns {{ calls: ToolCall[]; malformed: boolean }} The calls and the
+   *   state of the envelope.
+   */
+  nestedCalls = (
+    input: Readonly<Record<string, unknown>>,
+  ): { calls: ToolCall[]; malformed: boolean } => {
     const uses = input["tool_uses"];
-    if (!Array.isArray(uses)) {
-      return [];
+    if (uses === undefined) {
+      return { calls: [], malformed: false };
     }
-    return uses.filter(isRecord).map((use) => ({
-      input: isRecord(use["parameters"]) ? use["parameters"] : {},
-      toolName: typeof use["recipient_name"] === "string" ? use["recipient_name"] : "",
-    }));
+    if (!Array.isArray(uses)) {
+      return { calls: [], malformed: true };
+    }
+    const calls: ToolCall[] = [];
+    let malformed = false;
+    for (const use of uses) {
+      if (!isRecord(use)) {
+        malformed = true;
+        continue;
+      }
+      const toolName = use["recipient_name"];
+      const parameters = use["parameters"];
+      if (typeof toolName !== "string") {
+        malformed = true;
+      }
+      if (parameters !== undefined && !isRecord(parameters)) {
+        malformed = true;
+      }
+      calls.push({
+        input: isRecord(parameters) ? parameters : {},
+        toolName: typeof toolName === "string" ? toolName : "",
+      });
+    }
+    return { calls, malformed };
   },
   toolViolation = (
     event: ToolCall,
@@ -72,21 +101,36 @@ const MAX_NESTING = 8,
     model: CallModel | undefined,
     depth = 0,
   ): string | null => {
+    const planning = isPlanningModel(model);
     if (depth > MAX_NESTING) {
-      return null;
+      // A planning model fails closed: a call it cannot inspect is a call it
+      // cannot allow. Other models keep the old behaviour.
+      return planning
+        ? `planning-readonly: blocked a nested call deeper than ${MAX_NESTING} levels. A planning ` +
+            "model may only run calls it can inspect."
+        : null;
     }
     const call = { input: event.input, toolName: canonicalToolName(event.toolName) },
       own =
         enforceTimeout(call.toolName, call.input) ??
         codeWaitViolation(call.toolName, call.input) ??
-        (isPlanningModel(model) ? planningToolReason(call.toolName, call.input) : null) ??
+        // The planning policy authorizes the raw event name, so a tool that
+        // only ends with a trusted name is not that tool.
+        (planning ? planningToolReason(event.toolName, event.input) : null) ??
         (SHELL_TOOL_NAMES.has(call.toolName) ? shellViolation(call, cwd) : null) ??
         (EDIT_TOOL_NAMES.has(call.toolName) ? editViolation(call, cwd) : null);
     if (own !== null) {
       return own;
     }
-    for (const nested of nestedCalls(call.input)) {
-      const message = toolViolation(nested, cwd, model, depth + 1);
+    const nested = nestedCalls(call.input);
+    if (nested.malformed && planning) {
+      return (
+        "planning-readonly: blocked a nested call with a malformed envelope. A planning model " +
+        "may only run calls it can inspect."
+      );
+    }
+    for (const child of nested.calls) {
+      const message = toolViolation(child, cwd, model, depth + 1);
       if (message !== null) {
         return message;
       }

@@ -68,7 +68,8 @@ test("a planning model may not use dynamic or redirecting shell syntax", () => {
 });
 
 test("a planning model may not use an unknown option of a read command", () => {
-  assert.notEqual(planningShellReason("ls --color=always"), null);
+  assert.equal(planningShellReason("ls --color=always"), null);
+  assert.equal(planningShellReason("ls --time-style=long-iso"), null);
   assert.equal(planningShellReason("ls -la"), null);
   assert.notEqual(planningShellReason("rg --pre /bin/cat pattern"), null);
   assert.notEqual(planningShellReason("git status --bogus"), null);
@@ -97,16 +98,18 @@ test("a planning model may use the read tools and the workflow controls", () => 
     "lsp_diagnostics",
     "ctx_search",
     "ctx_stats",
+    "mcp__context_mode__ctx_search",
+    "mcp__context_mode__ctx_stats",
     "hindsight_search_knowledge_pages",
     "hindsight_list_knowledge_pages",
     "hindsight_read_knowledge_page",
     "hindsight_reflect",
     "hindsight_sync_status",
     "hindsight_diagnose",
-    "search_graph",
-    "get_code_snippet",
-    "trace_path",
-    "detect_changes",
+    "mcp__codebase_memory__search_graph",
+    "mcp__codebase_memory__get_code_snippet",
+    "mcp__codebase_memory__trace_path",
+    "mcp__codebase_memory__detect_changes",
     "todo",
     "ask",
     "interview",
@@ -119,6 +122,24 @@ test("a planning model may use the read tools and the workflow controls", () => 
     "mcp__dogsled__done",
   ]) {
     assert.equal(planningToolReason(toolName, {}), null, toolName);
+  }
+});
+
+test("a planning model may only call a tool by its exact trusted name", () => {
+  for (const toolName of [
+    "dangerous_read",
+    "mcp__untrusted__read",
+    "mcp__untrusted__find",
+    "fake_codemode",
+    "mcp__untrusted__codemode",
+    "fake_shell",
+    "mcp__untrusted__bash",
+    "search_graph",
+    "get_code_snippet",
+    "trace_path",
+    "detect_changes",
+  ]) {
+    assert.match(planningToolReason(toolName, {}) ?? "", /^planning-readonly:/u, toolName);
   }
 });
 
@@ -148,4 +169,87 @@ test("a planning model may run a read-only shell command through a shell tool", 
     planningToolReason("ctx_execute", { code: "print(1)", language: "python" }),
     null,
   );
+});
+
+test("a planning model may not use a dollar-quoted word", () => {
+  for (const command of ["find . $'-delete'", "rg $'--pre=./evil' pattern .", 'ls $"*.ts"']) {
+    assert.notEqual(planningShellReason(command), null, command);
+  }
+});
+
+test("a planning model may only run an exact known executable", () => {
+  for (const command of [
+    "./ls",
+    "/repo/tools/git status",
+    "ls@evil",
+    "find@1 .",
+    "git.exe status",
+  ]) {
+    assert.notEqual(planningShellReason(command), null, command);
+  }
+});
+
+test("a planning model may not use an option that needs a value", () => {
+  for (const command of [
+    "rg --max-count",
+    "rg --max-count --line-number pattern .",
+    "grep --context",
+    "find . -name",
+    "git log -n",
+    "git log --max-count",
+    "git -C",
+    "find . -maxdepth",
+    "rg -C",
+  ]) {
+    assert.notEqual(planningShellReason(command), null, command);
+  }
+});
+
+test("a planning model may use a short cluster of read-only options", () => {
+  assert.equal(planningShellReason("ls -la"), null);
+  assert.equal(planningShellReason("grep -rn 'tool_call' src"), null);
+  assert.notEqual(planningShellReason("ls -lx"), null);
+  assert.notEqual(planningShellReason("ls -lZ"), null);
+});
+
+test("a planning model may use an enumerated option value", () => {
+  assert.equal(planningShellReason("ls --color=never"), null);
+  assert.equal(planningShellReason("git status --untracked-files=all"), null);
+  assert.notEqual(planningShellReason("ls --color=bogus"), null);
+  assert.notEqual(planningShellReason("git status --untracked-files=bogus"), null);
+});
+
+test("a planning model may not read a git option after the terminator", () => {
+  assert.notEqual(planningShellReason("git diff -- --no-ext-diff --no-textconv"), null);
+  assert.equal(planningShellReason("git diff --no-ext-diff --no-textconv -- src/a.ts"), null);
+});
+
+test("a raw command is classified by its argument list", () => {
+  assert.equal(planningToolReason("hypa_shell", { command: "ls", raw: true }), null);
+  assert.notEqual(
+    planningToolReason("hypa_shell", { command: 'find . -name "* -o -delete -name *', raw: true }),
+    null,
+  );
+  assert.notEqual(planningToolReason("hypa_shell", { command: "rm x", raw: true }), null);
+});
+
+test("a raw command keeps the words of a quoted argument", () => {
+  assert.equal(
+    planningToolReason("hypa_shell", { command: "rg 'hooks|agent-browser' packages", raw: true }),
+    null,
+  );
+});
+
+test("a batch validates every command on its own", () => {
+  assert.equal(
+    planningToolReason("ctx_batch_execute", { commands: [{ command: "ls" }, { command: "pwd" }] }),
+    null,
+  );
+  assert.notEqual(
+    planningToolReason("ctx_batch_execute", { commands: [{ command: "ls" }, { command: "rm x" }] }),
+    null,
+  );
+  assert.notEqual(planningToolReason("ctx_batch_execute", { commands: ["ls"] }), null);
+  assert.notEqual(planningToolReason("ctx_batch_execute", { commands: [{ label: "x" }] }), null);
+  assert.notEqual(planningToolReason("ctx_batch_execute", { commands: "ls" }), null);
 });
