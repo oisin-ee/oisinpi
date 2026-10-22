@@ -9,6 +9,7 @@ import {
   commandsFromToolInput,
 } from "./tool-inputs.ts";
 import { codeWaitViolation, enforceTimeout } from "./tool-timeouts.ts";
+import { isPlanningModel, planningToolReason } from "./planning-policy.ts";
 import { classifyEdits, editInputsFromPayload } from "../policies/edit.ts";
 import { SHELL_CLASSIFIERS } from "../policies/shell.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -21,6 +22,12 @@ type GuardrailsAPI = Readonly<Pick<ExtensionAPI, "on">>;
 interface ToolCall {
   readonly toolName: string;
   readonly input: Record<string, unknown>;
+}
+
+/** The model of the session, as the context reports it. */
+interface CallModel {
+  readonly provider?: string;
+  readonly id?: string;
 }
 
 // A codemode script's nested calls nest at most this deep before the gate stops looking.
@@ -59,7 +66,12 @@ const MAX_NESTING = 8,
       toolName: typeof use["recipient_name"] === "string" ? use["recipient_name"] : "",
     }));
   },
-  toolViolation = (event: ToolCall, cwd: string, depth = 0): string | null => {
+  toolViolation = (
+    event: ToolCall,
+    cwd: string,
+    model: CallModel | undefined,
+    depth = 0,
+  ): string | null => {
     if (depth > MAX_NESTING) {
       return null;
     }
@@ -67,13 +79,14 @@ const MAX_NESTING = 8,
       own =
         enforceTimeout(call.toolName, call.input) ??
         codeWaitViolation(call.toolName, call.input) ??
+        (isPlanningModel(model) ? planningToolReason(call.toolName, call.input) : null) ??
         (SHELL_TOOL_NAMES.has(call.toolName) ? shellViolation(call, cwd) : null) ??
         (EDIT_TOOL_NAMES.has(call.toolName) ? editViolation(call, cwd) : null);
     if (own !== null) {
       return own;
     }
     for (const nested of nestedCalls(call.input)) {
-      const message = toolViolation(nested, cwd, depth + 1);
+      const message = toolViolation(nested, cwd, model, depth + 1);
       if (message !== null) {
         return message;
       }
@@ -89,7 +102,7 @@ const MAX_NESTING = 8,
 export default function piGuardrails(pi: GuardrailsAPI): void {
   pi.on("tool_call", (event, ctx) => {
     try {
-      const message = toolViolation(event, ctx.cwd);
+      const message = toolViolation(event, ctx.cwd, ctx.model);
       return message === null ? undefined : { block: true, reason: message };
     } catch (error) {
       return { block: true, reason: error instanceof Error ? error.message : String(error) };
