@@ -1,6 +1,8 @@
 //! Branch-local outcomes and bounded work units, addressed by exact content.
 
 mod binding;
+#[cfg(test)]
+mod close_tests;
 mod contract;
 #[cfg(test)]
 mod contract_tests;
