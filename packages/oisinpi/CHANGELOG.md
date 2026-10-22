@@ -1,5 +1,16 @@
 # @oisin-ee/oisinpi
 
+## 0.10.2
+
+### Patch Changes
+
+- [#35](https://github.com/oisin-ee/oisinpi/pull/35) [`a4554dc`](https://github.com/oisin-ee/oisinpi/commit/a4554dc2e64ba6e82fe5731992ba26c0c31c59b2) Thanks [@momo-momokaya](https://github.com/apps/momo-momokaya)! - A worker can call `dogsled done` after it closes its seeded todo leaf. Before, the todo gate blocked `mcp__dogsled__done`, so a finished worker could not report done.
+- Updated dependencies [[`a4554dc`](https://github.com/oisin-ee/oisinpi/commit/a4554dc2e64ba6e82fe5731992ba26c0c31c59b2)]:
+  - @oisin-ee/pi-todo@0.10.2
+  - @oisin-ee/pi-guardrails@0.10.2
+  - @oisin-ee/pi-prewalk@0.10.2
+  - @oisin-ee/pi-tiers@0.10.2
+
 ## 0.10.1
 
 ### Patch Changes
