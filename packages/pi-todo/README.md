@@ -62,6 +62,14 @@ Untargeted `done` and `drop` affect open work only. A parent without `task` is n
 Appending children to a closed parent reopens it as pending. An active parent stays active.
 Outcome and subtask progress remain separate. Abandoned work never counts as completed.
 
+## Activation gate
+
+Shell, code, and mutation tools need one active local unit. Structured reads, workflow control, and `todo` calls stay available without one.
+The gate checks the selected model at each call. The planner selections `tier/plan-claude` and `tier/plan-gpt` skip the activation check, so a planning session can read and inspect without a unit.
+Every other selection needs an active unit, including a tier with another name and a physical model that only looks like a planner.
+The exemption is a workflow prerequisite, not a permission. It does not grant write access, and other policies such as guardrails still apply.
+An active unit stays required for the sessions that implement code.
+
 ## State
 
 Each task change is saved as a `todo-state` entry on the session branch. A resumed session, a `/tree` move,

@@ -152,6 +152,8 @@ Todo operations, structured reads, profile discovery, user questions, and workfl
 
 Planning and research that use shell or writes have their own bounded self-assigned units. There is no blanket Markdown exemption. The gate does not override plan-mode restrictions or existing guardrails. Human terminal commands and trusted extension internals are outside this agent-tool gate.
 
+The planner selections `tier/plan-claude` and `tier/plan-gpt` skip the activation check. The gate evaluates the selected model at each tool call, so the exemption starts and ends with the selection. Every other selection, including another tier name, another provider, and a physical model with the same name, still requires an active unit. The exemption is a workflow prerequisite, not a write permission. It does not grant write access, and it does not change the read-only policy, which is independent of task state.
+
 This is a workflow prerequisite, not a sandbox. Once a unit is active, version one does not police arbitrary program effects or file permissions. It cannot prove that a model's decomposition is sensible. The contract, explicit completion evidence, and review make bounded scope inspectable.
 
 In managed Pi sessions, Dogsled's own adapter requires a validated unit handoff for worker launches, including nested spawn calls. Recognized direct shell agent-launch shortcuts must not bypass this requirement. Implement launch-specific enforcement in Dogsled, not a Dogsled command parser inside pi-todo. Shell jobs such as tests remain Dogsled jobs under the current active unit, not new subagents or units. Arbitrary code remains outside any sandbox guarantee.

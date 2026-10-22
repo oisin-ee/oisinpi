@@ -7,6 +7,8 @@ const workUnitGuidance =
   "Supply deliverable, repository-relative scope, acceptance, prerequisite IDs, and self or worker/profile assignment. " +
   "Use local keys for new prerequisites and the optional start selector for atomic creation and activation. " +
   "Use returned IDs after creation. Update drafts before start; only one complete self leaf executes locally. " +
-  "Done requires concrete acceptance evidence; worker exit alone is not acceptance.";
+  "Done requires concrete acceptance evidence; worker exit alone is not acceptance. " +
+  "A planning session selected as tier/plan-claude or tier/plan-gpt needs no active unit. " +
+  "Every other session needs one active local unit before shell, code, or mutation tools.";
 
 export { workUnitGuidance };

@@ -2,8 +2,17 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { TaskProvider } from "./provider.ts";
 import { ownsTodo } from "./lifecycle.ts";
 
-/** Exact structured reads and workflow controls, never command-text inference. */
-const controls = new Set([
+/** Planning selections that skip the activation check, exact provider and model IDs. */
+const planningSelections = new Set(["plan-claude", "plan-gpt"]),
+  /**
+   * Whether the selected model is a planning selection.
+   * @param {Readonly<object>} model Selected model, when the session has one.
+   * @returns {boolean} Whether the activation check does not apply.
+   */
+  isPlanning = (model: { readonly provider?: string; readonly id?: string } | undefined): boolean =>
+    model?.provider === "tier" && planningSelections.has(model.id ?? ""),
+  /** Exact structured reads and workflow controls, never command-text inference. */
+  controls = new Set([
     "ask",
     "codemode",
     "interview",
@@ -56,7 +65,7 @@ const controls = new Set([
         return { block: false };
       }
       provider.context(ctx);
-      if (controls.has(event.toolName)) {
+      if (controls.has(event.toolName) || isPlanning(ctx.model)) {
         return { block: false };
       }
       const active = provider.capability().active();

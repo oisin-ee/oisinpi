@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { emptyParameters, emptyResult, runtimeFixture } from "./runtime-fixture.ts";
+import {
+  emptyParameters,
+  emptyResult,
+  runtimeFixture,
+  selectableFixture,
+} from "./runtime-fixture.ts";
 import { first, firstId, last } from "./contract-fixture.ts";
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { branchSnapshot } from "./state.ts";
@@ -106,6 +111,112 @@ describe("local-only execution", () => {
       await test.create();
       expect(test.provider().active()).toMatchObject({ ok: true, value: { seeded: false } });
       await test.call("bash", { command: "printf allowed" });
+      expect(results(test).at(last)).toMatchObject({ isError: false });
+    } finally {
+      test.session.dispose();
+    }
+  });
+});
+
+describe("planning selections", () => {
+  it.each(["plan-claude", "plan-gpt"])(
+    "allows direct shell under tier/%s without activation",
+    { timeout: 20_000 },
+    async (id) => {
+      expect.hasAssertions();
+      const test = await selectableFixture([{ id, kind: "virtual", provider: "tier" }]);
+      try {
+        await test.select("tier", id);
+        await test.call("bash", { command: "printf planner" });
+        expect(results(test).at(last)).toMatchObject({ isError: false });
+        expect(test.provider().active()).toMatchObject({ ok: true, value: null });
+      } finally {
+        test.session.dispose();
+      }
+    },
+  );
+
+  it.each(["plan-claude", "plan-gpt"])(
+    "allows nested shell under tier/%s without activation",
+    { timeout: 20_000 },
+    async (id) => {
+      expect.hasAssertions();
+      const test = await selectableFixture([{ id, kind: "virtual", provider: "tier" }]);
+      try {
+        await test.select("tier", id);
+        await test.call("codemode", {
+          code: 'return await tools.bash({command:"printf planner"})',
+        });
+        expect(JSON.stringify(results(test))).not.toContain("Start a complete self-assigned leaf");
+        expect(results(test).at(last)).toMatchObject({ isError: false });
+      } finally {
+        test.session.dispose();
+      }
+    },
+  );
+});
+
+describe("planning near matches", () => {
+  it.each([
+    ["another tier selection", { id: "exec-claude", kind: "virtual", provider: "tier" }],
+    [
+      "the same id under another provider",
+      { id: "plan-claude", kind: "virtual", provider: "faux" },
+    ],
+    [
+      "a display name that only looks like a planner",
+      { id: "Plan-Claude", kind: "virtual", provider: "tier" },
+    ],
+    [
+      "a physical model that only looks like a planner",
+      { id: "plan-claude", kind: "physical", provider: "faux" },
+    ],
+  ] as const)("keeps %s gated", { timeout: 20_000 }, async (_label, selection) => {
+    expect.hasAssertions();
+    const test = await selectableFixture([selection]);
+    try {
+      await test.select(selection.provider, selection.id);
+      await test.call("bash", { command: "printf gated" });
+      expect(JSON.stringify(results(test).at(last))).toContain(
+        "Start a complete self-assigned leaf",
+      );
+      expect(results(test).at(last)).toMatchObject({ isError: true });
+    } finally {
+      test.session.dispose();
+    }
+  });
+});
+
+describe("planning selection changes", () => {
+  it("re-gates work after the selection leaves a planner", { timeout: 20_000 }, async () => {
+    expect.hasAssertions();
+    const test = await selectableFixture([
+      { id: "plan-claude", kind: "virtual", provider: "tier" },
+    ]);
+    try {
+      await test.select("tier", "plan-claude");
+      await test.call("bash", { command: "printf planner" });
+      expect(results(test).at(last)).toMatchObject({ isError: false });
+      await test.select("faux", "faux-1");
+      await test.call("bash", { command: "printf writer" });
+      expect(JSON.stringify(results(test).at(last))).toContain(
+        "Start a complete self-assigned leaf",
+      );
+    } finally {
+      test.session.dispose();
+    }
+  });
+
+  it("allows a planner selection after a gated selection", { timeout: 20_000 }, async () => {
+    expect.hasAssertions();
+    const test = await selectableFixture([
+      { id: "plan-claude", kind: "virtual", provider: "tier" },
+    ]);
+    try {
+      await test.call("bash", { command: "printf writer" });
+      expect(results(test).at(last)).toMatchObject({ isError: true });
+      await test.select("tier", "plan-claude");
+      await test.call("bash", { command: "printf planner" });
       expect(results(test).at(last)).toMatchObject({ isError: false });
     } finally {
       test.session.dispose();

@@ -27,6 +27,12 @@ interface Startup {
   readonly cwd: string;
   readonly seedPath: string;
 }
+/** One selectable model in the runtime catalog. */
+interface Selection {
+  readonly id: string;
+  readonly kind?: "physical" | "virtual";
+  readonly provider: string;
+}
 interface RuntimeFixture {
   readonly session: Readonly<Pick<Session, "dispose" | "abort" | "messages">> & {
     readonly extensionRunner: Readonly<Pick<Session["extensionRunner"], "emitToolResult" | "emit">>;
@@ -35,27 +41,32 @@ interface RuntimeFixture {
   readonly provider: () => TaskProviderV1;
   readonly call: (name: string, args: Readonly<Record<string, string>>) => Promise<void>;
   readonly create: () => Promise<void>;
+  readonly select: (provider: string, id: string) => Promise<void>;
   readonly todo: (params: TodoParams) => Promise<unknown>;
+}
+/** Plain description of one runtime fixture. */
+interface FixtureRequest {
+  readonly collision: boolean;
+  readonly later: ExtensionFactory | undefined;
+  readonly selections: readonly Selection[];
+  readonly startup: Startup | undefined;
 }
 
 /**
  * Creates resources without user configuration or external services.
- * @param {ExtensionFactory} later Optional additional guard or test tool.
- * @param {boolean} collision Whether the other todo owner loads first.
- * @param {Startup | undefined} startup Optional worker startup configuration.
+ * @param {Readonly<FixtureRequest>} request Fixture description.
  * @returns {object} Local resource owners.
  */
 const resources = (
-    later: ExtensionFactory | undefined,
-    collision: boolean,
-    startup: Startup | undefined,
+    request: Readonly<FixtureRequest>,
   ): {
     events: ReturnType<typeof createEventBus>;
     manager: SessionManager;
     settings: SettingsManager;
     loader: DefaultResourceLoader;
   } => {
-    const events = createEventBus(),
+    const { collision, later, startup } = request,
+      events = createEventBus(),
       manager = SessionManager.inMemory(),
       settings = SettingsManager.inMemory({
         compaction: { enabled: false },
@@ -130,47 +141,55 @@ const resources = (
     );
   },
   /**
-   * Executes a scripted tool request through the actual model runtime.
-   * @param {Session} session Session execution owner.
-   * @param {Readonly<ReturnType<typeof fauxProvider>>} faux Scripted provider.
-   * @returns {RuntimeFixture["call"]} Request function.
+   * Creates the model catalog with the requested physical and virtual entries.
+   * @param {Readonly<FixtureRequest>} request Fixture description.
+   * @returns {object} Scripted provider and model catalog owner.
    */
-  caller =
-    (
-      session: Readonly<Pick<Session, "prompt">>,
-      faux: Readonly<Pick<ReturnType<typeof fauxProvider>, "setResponses">>,
-    ): RuntimeFixture["call"] =>
-    async (name, args): Promise<void> => {
-      faux.setResponses([
-        fauxAssistantMessage(fauxToolCall(name, args)),
-        fauxAssistantMessage("Done."),
-      ]);
-      await session.prompt("Exercise one tool.");
-    },
-  /**
-   * Loads the real runner and codemode with a scripted model.
-   * @param {ExtensionFactory} later Additional extension.
-   * @param {boolean} collision Loads a competing owner first.
-   * @param {Startup | undefined} startup Optional worker startup configuration.
-   * @returns {Promise<RuntimeFixture>} Isolated runtime and callers.
-   */
-  runtimeFixture = async (
-    later?: ExtensionFactory,
-    collision = false,
-    startup?: Startup,
-  ): Promise<RuntimeFixture> => {
-    const setup = resources(later, collision, startup),
-      modelRuntime = await ModelRuntime.create({
+  catalog = async (
+    request: Readonly<FixtureRequest>,
+  ): Promise<{
+    faux: ReturnType<typeof fauxProvider>;
+    modelRuntime: ModelRuntime;
+  }> => {
+    const modelRuntime = await ModelRuntime.create({
         credentials: new InMemoryCredentialStore(),
         modelsPath: null,
         modelsStore: new InMemoryModelsStore(),
         refreshOnCreate: false,
       }),
-      faux = fauxProvider({ tokensPerSecond: 0 });
+      faux = fauxProvider({
+        models: [
+          ...request.selections
+            .filter((selection) => selection.kind === "physical")
+            .map((selection) => ({ id: selection.id })),
+          { id: "faux-1" },
+        ],
+        tokensPerSecond: 0,
+      });
     modelRuntime.registerNativeProvider(faux.provider);
+    for (const selection of request.selections.filter((entry) => entry.kind !== "physical")) {
+      modelRuntime.registerVirtualModel({
+        id: selection.id,
+        name: selection.id,
+        provider: selection.provider,
+        route: () => ({ model: faux.getModel(), thinkingLevel: "off" }),
+        thinkingLevels: ["off"],
+      });
+    }
+    await modelRuntime.refresh({ allowNetwork: false });
+    return { faux, modelRuntime };
+  },
+  /**
+   * Builds the real session and its callers over prepared resources.
+   * @param {Readonly<FixtureRequest>} request Fixture description.
+   * @returns {Promise<RuntimeFixture>} Isolated runtime and callers.
+   */
+  buildFixture = async (request: Readonly<FixtureRequest>): Promise<RuntimeFixture> => {
+    const setup = resources(request),
+      { faux, modelRuntime } = await catalog(request);
     await setup.loader.reload();
     const { session } = await createAgentSession({
-      cwd: startup?.cwd ?? "/tmp",
+      cwd: request.startup?.cwd ?? "/tmp",
       model: faux.getModel(),
       modelRuntime,
       resourceLoader: setup.loader,
@@ -181,7 +200,13 @@ const resources = (
     await session.bindExtensions({});
     session.setActiveToolsByName([...session.getActiveToolNames(), "codemode"]);
     return {
-      call: caller(session, faux),
+      call: async (name, args): Promise<void> => {
+        faux.setResponses([
+          fauxAssistantMessage(fauxToolCall(name, args)),
+          fauxAssistantMessage("Done."),
+        ]);
+        await session.prompt("Exercise one tool.");
+      },
       create: async (): Promise<void> => {
         await todoCall(session, {
           items: [{ content: "Build", contract: contract(), key: "build" }],
@@ -191,10 +216,36 @@ const resources = (
       },
       manager: setup.manager,
       provider: () => acquire(setup.events),
+      select: async (provider, id): Promise<void> => {
+        const model = modelRuntime.getModel(provider, id);
+        if (model === undefined) {
+          throw new Error(`Unknown selection: ${provider}/${id}`);
+        }
+        await session.setModel(model);
+      },
       session,
       todo: async (params): Promise<unknown> => todoCall(session, params),
     };
   },
+  /**
+   * Loads the real runner and codemode with a scripted model.
+   * @param {ExtensionFactory} later Optional additional guard or test tool.
+   * @param {boolean} collision Whether the other todo owner loads first.
+   * @param {Startup | undefined} startup Optional worker startup configuration.
+   * @returns {Promise<RuntimeFixture>} Isolated runtime and callers.
+   */
+  runtimeFixture = async (
+    later?: ExtensionFactory,
+    collision = false,
+    startup?: Startup,
+  ): Promise<RuntimeFixture> => buildFixture({ collision, later, selections: [], startup }),
+  /**
+   * Loads the real runtime with selectable virtual and physical models.
+   * @param {readonly Selection[]} selections Selectable catalog entries.
+   * @returns {Promise<RuntimeFixture>} Runtime with the given selections.
+   */
+  selectableFixture = async (selections: readonly Selection[]): Promise<RuntimeFixture> =>
+    buildFixture({ collision: false, later: undefined, selections, startup: undefined }),
   /**
    * Produces a deterministic tool result.
    * @returns {object} Successful content.
@@ -205,5 +256,5 @@ const resources = (
   }),
   emptyParameters = Type.Object({});
 
-export { emptyParameters, emptyResult, runtimeFixture };
-export type { RuntimeFixture };
+export { emptyParameters, emptyResult, runtimeFixture, selectableFixture };
+export type { RuntimeFixture, Selection };
