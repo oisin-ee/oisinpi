@@ -37,6 +37,7 @@ const controls = new Set([
     "mcp__dogsled__send",
     "mcp__dogsled__cancel",
     "mcp__dogsled__close",
+    "mcp__dogsled__done",
     "mcp__dogsled__stop",
     "mcp__dogsled__read",
     "mcp__dogsled__status",
