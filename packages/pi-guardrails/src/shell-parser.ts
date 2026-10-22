@@ -32,6 +32,7 @@ interface ShNode {
 }
 
 interface Parsed {
+  readonly tree: unknown;
   readonly calls: readonly Words[];
   readonly guards: readonly Guard[];
 }
@@ -145,7 +146,7 @@ const MAX_BUFFER = 16 * 1024 * 1024,
         }
       };
     visit(tree);
-    return { calls, guards };
+    return { tree, calls, guards };
   },
   parsedOf = (command: string): Parsed => {
     if (cache.command !== command || cache.parsed === undefined) {
@@ -170,4 +171,51 @@ const MAX_BUFFER = 16 * 1024 * 1024,
   shellCallGuards = (command: string): (string[][] | null)[] =>
     parsedOf(command).guards.map((stages) => stages?.map((words) => [...words]) ?? null);
 
-export { shellCallGuards, shellCalls };
+/**
+ * Returns literal calls only when the complete AST has read-only shell syntax.
+ * @param {string} command Shell text.
+ * @returns {string[][] | null} Literal argv, or null for unsupported syntax.
+ */
+function literalShellCalls(command: string): string[][] | null {
+  const parsed = parsedOf(command),
+    allowed = new Set([
+      "File",
+      "Stmt",
+      "CallExpr",
+      "Word",
+      "Lit",
+      "SglQuoted",
+      "DblQuoted",
+      "BinaryCmd",
+    ]),
+    safe = (node: unknown, quoted = false): boolean => {
+      if (Array.isArray(node)) {
+        return node.every((item: unknown) => safe(item, quoted));
+      }
+      if (!isNode(node)) {
+        return true;
+      }
+      if (node.Type !== undefined && !allowed.has(node.Type)) {
+        return false;
+      }
+      if (
+        node.Background === true ||
+        (node.Redirs ?? []).length > 0 ||
+        (node.Assigns ?? []).length > 0 ||
+        (node.Type === "CallExpr" && (node.Args ?? []).length === 0) ||
+        (node.Type === "BinaryCmd" && !["&&", "||", "|"].includes(node.Op ?? "")) ||
+        (node.Type === "Lit" && !quoted && /[*?[\]{}]/u.test(node.Value ?? "")) ||
+        (node.Type === "Lit" && !quoted && (node.Value ?? "").startsWith("~"))
+      ) {
+        return false;
+      }
+      return Object.values(node).every((value: unknown) =>
+        safe(value, quoted || node.Type === "DblQuoted"),
+      );
+    };
+  return safe(parsed.tree) && parsed.calls.length > 0
+    ? parsed.calls.map((words) => [...words])
+    : null;
+}
+
+export { literalShellCalls, shellCallGuards, shellCalls };
