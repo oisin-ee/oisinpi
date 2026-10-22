@@ -13,6 +13,11 @@ interface Verdict {
   readonly reason?: string;
 }
 
+interface CallContext {
+  readonly cwd: string;
+  readonly model?: { readonly provider: string; readonly id: string };
+}
+
 function fakePi() {
   const handlers = new Map<string, Handler>(),
     followUps: unknown[] = [];
@@ -26,7 +31,7 @@ function fakePi() {
     trigger: async (
       event: string,
       payload: Readonly<Record<string, unknown>>,
-      context: { cwd: string },
+      context: CallContext,
     ) => (await handlers.get(event)?.(payload, context)) as Verdict | undefined,
   };
 }
@@ -324,4 +329,63 @@ test("pi refuses herdr agent prompt to another agent and allows dogsled send", a
     { cwd: "/repo" },
   );
   assert.equal(allowed, undefined);
+});
+
+test("pi allows a planning model to read and blocks it from changing anything", async () => {
+  const pi = fakePi();
+  install(pi);
+  const planner = { cwd: "/repo", model: { provider: "tier", id: "plan-claude" } };
+  for (const [toolName, input, blocked] of [
+    ["read", { path: "/repo/a.ts" }, false],
+    ["grep", { pattern: "x" }, false],
+    ["bash", { command: "ls" }, false],
+    ["bash", { command: "git status" }, false],
+    ["todo", { items: [] }, false],
+    ["bash", { command: "rm file" }, true],
+    ["bash", { command: "ls > out.txt" }, true],
+    ["write", { path: "/repo/a.ts", content: "x" }, true],
+    ["edit", { path: "/repo/a.ts", newText: "x" }, true],
+    ["mcp__context_mode__ctx_run", {}, true],
+  ] as [string, Record<string, unknown>, boolean][]) {
+    const result = await pi.trigger("tool_call", { input, toolName }, planner);
+    assert.equal(result?.block ?? false, blocked, toolName);
+    if (blocked) {
+      assert.match(result?.reason ?? "", /^planning-readonly:/u, toolName);
+    }
+  }
+});
+
+test("pi blocks a nested write from a planning model", async () => {
+  const pi = fakePi();
+  install(pi);
+  const result = await pi.trigger(
+    "tool_call",
+    {
+      input: {
+        code: "print(1)",
+        language: "python",
+        tool_uses: [{ parameters: { path: "/repo/a.ts" }, recipient_name: "write" }],
+      },
+      toolName: "codemode",
+    },
+    { cwd: "/repo", model: { provider: "tier", id: "plan-gpt" } },
+  );
+  assert.equal(result?.block, true);
+  assert.match(result?.reason ?? "", /^planning-readonly:/u);
+});
+
+test("pi leaves a non-planning model free to write and run commands", async () => {
+  const pi = fakePi();
+  install(pi);
+  for (const context of [
+    { cwd: "/repo" },
+    { cwd: "/repo", model: { provider: "tier", id: "worker-gpt" } },
+  ] as CallContext[]) {
+    const result = await pi.trigger(
+      "tool_call",
+      { input: { command: "echo ready > /tmp/out" }, toolName: "bash" },
+      context,
+    );
+    assert.equal(result, undefined, JSON.stringify(context));
+  }
 });
