@@ -1,5 +1,11 @@
 # @oisin-ee/pi-todo
 
+## 0.10.1
+
+### Patch Changes
+
+- [#33](https://github.com/oisin-ee/oisinpi/pull/33) [`ac2e931`](https://github.com/oisin-ee/oisinpi/commit/ac2e931bf8d907eced3d075ebae2e9707713ea6f) Thanks [@momo-momokaya](https://github.com/apps/momo-momokaya)! - The owning lead can close any open leaf with `done` and a short note, or with `drop`. Closing a leaf that a worker holds clears the binding, records the execution as released, and frees its paths. A late settlement for a released execution is a no-op.
+
 ## 0.10.0
 
 ### Minor Changes
