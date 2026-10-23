@@ -13,43 +13,13 @@ Agent guardrails for [pi](https://pi.dev), Claude Code, and Codex. One set of po
 In pi, it also fills a missing shell timeout (120 s) and blocks one above 10 minutes, naming each tool's unit.
 Shell text is parsed with `shfmt`, which must be on `PATH`. A command that cannot be parsed is blocked.
 
-## Read-only planning models
+## Planning models
 
-A planning model (`tier/plan-claude` or `tier/plan-gpt`) may only read. The guardrails read the model of
-each tool call from the session context, so the rule follows a model switch.
+The guardrails do not restrict a model by its identity. The planning selections `tier/plan-claude` and
+`tier/plan-gpt` keep the full policy set: a planning model may run Git commands, write and edit files,
+and use the workflow tools.
 
-A planning model may call:
-
-- the read tools: `read`, `ls`, `find`, `grep`, `hypa_read`, `hypa_ls`, `hypa_find`, `hypa_grep`,
-  `web_search`, `web_fetch`, `lsp_diagnostics`, `ctx_search`, `ctx_stats`, the `hindsight` read tools, and
-  the `codebase_memory` read tools;
-- the workflow controls: `todo`, `ask`, `interview`, `tool_search`, and `codemode`;
-- the Dogsled tools `read`, `status`, `inbox`, `send`, and `done`, and a `spawn` of a bound unit by its id;
-- a shell read: `pwd`, `ls`, `rg`, `grep`, `find` without `-exec`, `-delete`, or `-fprint`, and `git status`,
-  `git diff`, `git log`, `git show`, and `git rev-parse` with read-only options.
-
-Every trusted name is exact. A tool whose name only resembles a trusted one, such as `dangerous_read` or
-`mcp__untrusted__read`, is blocked. The same holds for a command: only `pwd`, `ls`, `rg`, `grep`, `find`,
-and `git` are reads, so `./ls` and `/repo/tools/git status` are blocked.
-
-The shell check uses the `shfmt` syntax tree, so a redirect, an assignment, a substitution, a glob, a
-dollar-quoted word, or a background call is blocked even when the command itself reads. `git diff`,
-`git log -p`, and `git show` must carry `--no-ext-diff --no-textconv`, because a diff driver or a
-textconv filter can run a program. A word after `--` is a path, so it cannot carry those flags.
-
-Each command has its own option grammar. An option that needs a value must have one, an option that
-accepts only some values accepts only those, and a `find` option that changes the filesystem is blocked.
-
-A `hypa_shell` call with `raw: true` runs without a shell, so the runner splits the command on
-whitespace. The policy classifies those words, so a flag hidden in a quoted argument cannot slip through.
-
-Every command of a `ctx_batch_execute` call is checked on its own. A malformed entry is blocked.
-
-A nested call that the policy cannot inspect, such as a malformed codemode envelope or a call deeper
-than eight levels, is blocked for a planning model.
-
-Every other tool, including `write`, `edit`, and any command that changes the repository or the system,
-is blocked for a planning model. Other models keep the full policy set.
+Planning restrictions belong to Plannotator. It owns plan mode, and it blocks writes while it plans.
 
 ## pi
 

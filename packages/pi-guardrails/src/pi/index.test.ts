@@ -331,201 +331,43 @@ test("pi refuses herdr agent prompt to another agent and allows dogsled send", a
   assert.equal(allowed, undefined);
 });
 
-test("pi allows a planning model to read and blocks it from changing anything", async () => {
+test("pi does not ban a planning identity from Git, markdown editing, or workflow tools", async () => {
   const pi = fakePi();
   install(pi);
-  const planner = { cwd: "/repo", model: { provider: "tier", id: "plan-claude" } };
-  for (const [toolName, input, blocked] of [
-    ["read", { path: "/repo/a.ts" }, false],
-    ["grep", { pattern: "x" }, false],
-    ["bash", { command: "ls" }, false],
-    ["bash", { command: "git status" }, false],
-    ["todo", { items: [] }, false],
-    ["bash", { command: "rm file" }, true],
-    ["bash", { command: "ls > out.txt" }, true],
-    ["write", { path: "/repo/a.ts", content: "x" }, true],
-    ["edit", { path: "/repo/a.ts", newText: "x" }, true],
-    ["mcp__context_mode__ctx_run", {}, true],
-  ] as [string, Record<string, unknown>, boolean][]) {
-    const result = await pi.trigger("tool_call", { input, toolName }, planner);
-    assert.equal(result?.block ?? false, blocked, toolName);
-    if (blocked) {
-      assert.match(result?.reason ?? "", /^planning-readonly:/u, toolName);
+  for (const model of [
+    { provider: "tier", id: "plan-claude" },
+    { provider: "tier", id: "plan-gpt" },
+  ]) {
+    const planner = { cwd: "/repo", model };
+    for (const [toolName, input] of [
+      ["bash", { command: "git status" }],
+      ["bash", { command: "git diff" }],
+      ["bash", { command: "git log --oneline" }],
+      ["write", { path: "/repo/plan.md", content: "- [ ] step" }],
+      ["edit", { path: "/repo/plan.md", newText: "- [ ] step" }],
+      ["todo", { items: [] }],
+      ["mcp__dogsled__spawn", { unit: "u-1" }],
+    ] as [string, Record<string, unknown>][]) {
+      const result = await pi.trigger("tool_call", { input, toolName }, planner);
+      assert.equal(result, undefined, `${model.id} ${toolName}`);
     }
   }
 });
 
-test("pi blocks a nested write from a planning model", async () => {
+test("pi applies the same safeguards to a planning identity and another model", async () => {
   const pi = fakePi();
   install(pi);
-  const result = await pi.trigger(
-    "tool_call",
-    {
-      input: {
-        code: "print(1)",
-        language: "python",
-        tool_uses: [{ parameters: { path: "/repo/a.ts" }, recipient_name: "write" }],
-      },
-      toolName: "codemode",
-    },
-    { cwd: "/repo", model: { provider: "tier", id: "plan-gpt" } },
-  );
-  assert.equal(result?.block, true);
-  assert.match(result?.reason ?? "", /^planning-readonly:/u);
-});
-
-test("pi leaves a non-planning model free to write and run commands", async () => {
-  const pi = fakePi();
-  install(pi);
-  for (const context of [
-    { cwd: "/repo" },
-    { cwd: "/repo", model: { provider: "tier", id: "worker-gpt" } },
-  ] as CallContext[]) {
-    const result = await pi.trigger(
+  for (const model of [
+    { provider: "tier", id: "plan-claude" },
+    { provider: "tier", id: "worker-gpt" },
+  ]) {
+    const context = { cwd: "/repo", model };
+    const blocked = await pi.trigger(
       "tool_call",
-      { input: { command: "echo ready > /tmp/out" }, toolName: "bash" },
+      { input: { command: "git stash push -- src && git stash pop" }, toolName: "bash" },
       context,
     );
-    assert.equal(result, undefined, JSON.stringify(context));
+    assert.equal(blocked?.block, true, model.id);
+    assert.match(blocked?.reason ?? "", /^git-gate:.*stash push and git stash pop/u);
   }
-});
-
-const PLANNER = { cwd: "/repo", model: { provider: "tier", id: "plan-claude" } };
-
-test("pi blocks a planning model that uses a tool name it only resembles", async () => {
-  const pi = fakePi();
-  install(pi);
-  for (const [toolName, input] of [
-    ["dangerous_read", { path: "/repo/a.ts" }],
-    ["mcp__untrusted__read", { path: "/repo/a.ts" }],
-    ["mcp__untrusted__codemode", { code: "print(1)", language: "python" }],
-    ["mcp__untrusted__bash", { command: "ls" }],
-  ] as [string, Record<string, unknown>][]) {
-    const result = await pi.trigger("tool_call", { input, toolName }, PLANNER);
-    assert.equal(result?.block, true, toolName);
-    assert.match(result?.reason ?? "", /^planning-readonly:/u, toolName);
-  }
-});
-
-test("pi blocks a planning model that hides a write in shell syntax", async () => {
-  const pi = fakePi();
-  install(pi);
-  for (const command of [
-    "find . $'-delete'",
-    "rg $'--pre=./evil' pattern .",
-    "./ls",
-    "/repo/tools/git status",
-    "ls@evil",
-    "git diff -- --no-ext-diff --no-textconv",
-    "rg --max-count",
-  ]) {
-    const result = await pi.trigger("tool_call", { input: { command }, toolName: "bash" }, PLANNER);
-    assert.equal(result?.block, true, command);
-    assert.match(result?.reason ?? "", /^planning-readonly:/u, command);
-  }
-});
-
-test("pi blocks a planning model that hides a write in a raw command", async () => {
-  const pi = fakePi();
-  install(pi);
-  const result = await pi.trigger(
-    "tool_call",
-    { input: { command: 'find . -name "* -o -delete -name *', raw: true }, toolName: "hypa_shell" },
-    PLANNER,
-  );
-  assert.equal(result?.block, true);
-  assert.match(result?.reason ?? "", /^planning-readonly:/u);
-});
-
-test("pi blocks a planning model whose batch holds one bad command", async () => {
-  const pi = fakePi();
-  install(pi);
-  for (const commands of [[{ command: "ls" }, { command: "rm x" }], ["ls"], [{ label: "x" }]]) {
-    const result = await pi.trigger(
-      "tool_call",
-      { input: { commands }, toolName: "ctx_batch_execute" },
-      PLANNER,
-    );
-    assert.equal(result?.block, true, JSON.stringify(commands));
-    assert.match(result?.reason ?? "", /^planning-readonly:/u);
-  }
-});
-
-test("pi blocks a planning model whose nested call cannot be inspected", async () => {
-  const pi = fakePi();
-  install(pi);
-  for (const input of [
-    { code: "print(1)", language: "python", tool_uses: [{ parameters: {} }] },
-    { code: "print(1)", language: "python", tool_uses: [{ parameters: {}, recipient_name: "" }] },
-    { code: "print(1)", language: "python", tool_uses: "bash" },
-    {
-      code: "print(1)",
-      language: "python",
-      tool_uses: [{ parameters: "x", recipient_name: "read" }],
-    },
-  ]) {
-    const result = await pi.trigger("tool_call", { input, toolName: "codemode" }, PLANNER);
-    assert.equal(result?.block, true, JSON.stringify(input));
-    assert.match(result?.reason ?? "", /^planning-readonly:/u);
-  }
-});
-
-test("pi blocks a planning model whose nested call nests too deep", async () => {
-  const pi = fakePi();
-  install(pi);
-  let input: Record<string, unknown> = { path: "/repo/a.ts" };
-  for (let depth = 0; depth < 12; depth += 1) {
-    input = { code: "print(1)", language: "python", tool_uses: [input] };
-  }
-  const result = await pi.trigger("tool_call", { input, toolName: "codemode" }, PLANNER);
-  assert.equal(result?.block, true);
-  assert.match(result?.reason ?? "", /^planning-readonly:/u);
-});
-
-test("pi allows a planning model to read and blocks a non-planning model from nothing", async () => {
-  const pi = fakePi();
-  install(pi);
-  for (const [toolName, input] of [
-    ["read", { path: "/repo/a.ts" }],
-    ["grep", { pattern: "x" }],
-    ["bash", { command: "ls" }],
-    ["bash", { command: "git status" }],
-    ["bash", { command: "ls --color=never" }],
-    ["hypa_shell", { command: "ls", raw: true }],
-    ["todo", { items: [] }],
-  ] as [string, Record<string, unknown>][]) {
-    const result = await pi.trigger("tool_call", { input, toolName }, PLANNER);
-    assert.equal(result, undefined, `${toolName} ${JSON.stringify(input)}`);
-  }
-});
-
-test("pi blocks a planning model whose shell command cannot be parsed", async () => {
-  const pi = fakePi();
-  install(pi);
-  const result = await pi.trigger(
-    "tool_call",
-    { input: { command: "ls 'broken" }, toolName: "bash" },
-    PLANNER,
-  );
-  assert.equal(result?.block, true);
-  assert.match(result?.reason ?? "", /shell-parser:/u);
-});
-
-test("pi follows the model of each call when the session switches", async () => {
-  const pi = fakePi();
-  install(pi);
-  const writer = { cwd: "/repo", model: { provider: "tier", id: "worker-gpt" } };
-  const planner = { cwd: "/repo", model: { provider: "tier", id: "plan-gpt" } };
-  const blocked = await pi.trigger(
-    "tool_call",
-    { input: { command: "rm x" }, toolName: "bash" },
-    planner,
-  );
-  assert.equal(blocked?.block, true);
-  const allowed = await pi.trigger(
-    "tool_call",
-    { input: { command: "rm x" }, toolName: "bash" },
-    writer,
-  );
-  assert.equal(allowed, undefined);
 });

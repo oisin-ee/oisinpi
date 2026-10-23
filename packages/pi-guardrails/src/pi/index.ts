@@ -9,7 +9,6 @@ import {
   commandsFromToolInput,
 } from "./tool-inputs.ts";
 import { codeWaitViolation, enforceTimeout } from "./tool-timeouts.ts";
-import { isPlanningModel, planningToolReason } from "./planning-policy.ts";
 import { classifyEdits, editInputsFromPayload } from "../policies/edit.ts";
 import { SHELL_CLASSIFIERS } from "../policies/shell.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -22,12 +21,6 @@ type GuardrailsAPI = Readonly<Pick<ExtensionAPI, "on">>;
 interface ToolCall {
   readonly toolName: string;
   readonly input: Record<string, unknown>;
-}
-
-/** The model of the session, as the context reports it. */
-interface CallModel {
-  readonly provider?: string;
-  readonly id?: string;
 }
 
 // A codemode script's nested calls nest at most this deep before the gate stops looking.
@@ -57,80 +50,44 @@ const MAX_NESTING = 8,
   editViolation = (call: ToolCall, cwd: string): string | null =>
     classifyEdits(editInputsFromPayload({ tool_input: call.input, tool_name: call.toolName }), cwd),
   /**
-   * The nested calls of a codemode input. A malformed envelope is a failure
-   * for a planning model, so it is reported rather than skipped.
+   * The nested calls of a codemode input.
    * @param {Readonly<Record<string, unknown>>} input The tool input.
-   * @returns {{ calls: ToolCall[]; malformed: boolean }} The calls and the
-   *   state of the envelope.
+   * @returns {readonly ToolCall[]} The calls of the envelope.
    */
-  nestedCalls = (
-    input: Readonly<Record<string, unknown>>,
-  ): { calls: ToolCall[]; malformed: boolean } => {
+  nestedCalls = (input: Readonly<Record<string, unknown>>): readonly ToolCall[] => {
     const uses = input["tool_uses"];
-    if (uses === undefined) {
-      return { calls: [], malformed: false };
-    }
     if (!Array.isArray(uses)) {
-      return { calls: [], malformed: true };
+      return [];
     }
     const calls: ToolCall[] = [];
-    let malformed = false;
     for (const use of uses) {
       if (!isRecord(use)) {
-        malformed = true;
         continue;
       }
       const toolName = use["recipient_name"];
       const parameters = use["parameters"];
-      if (typeof toolName !== "string") {
-        malformed = true;
-      }
-      if (parameters !== undefined && !isRecord(parameters)) {
-        malformed = true;
-      }
       calls.push({
         input: isRecord(parameters) ? parameters : {},
         toolName: typeof toolName === "string" ? toolName : "",
       });
     }
-    return { calls, malformed };
+    return calls;
   },
-  toolViolation = (
-    event: ToolCall,
-    cwd: string,
-    model: CallModel | undefined,
-    depth = 0,
-  ): string | null => {
-    const planning = isPlanningModel(model);
+  toolViolation = (event: ToolCall, cwd: string, depth = 0): string | null => {
     if (depth > MAX_NESTING) {
-      // A planning model fails closed: a call it cannot inspect is a call it
-      // cannot allow. Other models keep the old behaviour.
-      return planning
-        ? `planning-readonly: blocked a nested call deeper than ${MAX_NESTING} levels. A planning ` +
-            "model may only run calls it can inspect."
-        : null;
+      return null;
     }
     const call = { input: event.input, toolName: canonicalToolName(event.toolName) },
       own =
         enforceTimeout(call.toolName, call.input) ??
         codeWaitViolation(call.toolName, call.input) ??
-        // The planning policy authorizes the raw event name, so a tool that
-        // only ends with a trusted name is not that tool.
-        (planning ? planningToolReason(event.toolName, event.input) : null) ??
         (SHELL_TOOL_NAMES.has(call.toolName) ? shellViolation(call, cwd) : null) ??
         (EDIT_TOOL_NAMES.has(call.toolName) ? editViolation(call, cwd) : null);
     if (own !== null) {
       return own;
     }
-    const nested = nestedCalls(call.input);
-    if (nested.malformed && planning) {
-      return (
-        "planning-readonly: blocked a nested call with a malformed envelope. A planning model " +
-        "may only run calls it can inspect."
-      );
-    }
-    for (const child of nested.calls) {
-      const message = toolViolation(child, cwd, model, depth + 1);
+    for (const child of nestedCalls(call.input)) {
+      const message = toolViolation(child, cwd, depth + 1);
       if (message !== null) {
         return message;
       }
@@ -146,7 +103,7 @@ const MAX_NESTING = 8,
 export default function piGuardrails(pi: GuardrailsAPI): void {
   pi.on("tool_call", (event, ctx) => {
     try {
-      const message = toolViolation(event, ctx.cwd, ctx.model);
+      const message = toolViolation(event, ctx.cwd);
       return message === null ? undefined : { block: true, reason: message };
     } catch (error) {
       return { block: true, reason: error instanceof Error ? error.message : String(error) };
