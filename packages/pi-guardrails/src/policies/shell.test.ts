@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "vitest";
+import { onTestFinished, test } from "vitest";
 
 import {
   SHELL_MSG,
@@ -81,13 +81,16 @@ test("classifyGit blocks an unverified stash drop and every stash clear", () => 
 
 async function stashRepo() {
   const { execFileSync } = await import("node:child_process"),
-    { mkdirSync, mkdtempSync, realpathSync, writeFileSync } = await import("node:fs"),
+    { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } = await import("node:fs"),
     { tmpdir } = await import("node:os"),
     repo = realpathSync(mkdtempSync(`${tmpdir()}/stash-gate-`)),
     git = (...args: string[]) =>
       execFileSync("git", ["-C", repo, "-c", "user.name=t", "-c", "user.email=t@t", ...args], {
         encoding: "utf8",
       });
+  onTestFinished(() => {
+    rmSync(repo, { recursive: true, force: true });
+  });
   git("init", "-q");
   mkdirSync(`${repo}/sub`);
   writeFileSync(`${repo}/root.txt`, "a\n");
@@ -101,68 +104,221 @@ async function stashRepo() {
 const VERIFIED_DROP =
   "git stash show -p --binary -u stash@{0} | git apply --check -R && git stash drop stash@{0}";
 
-test("classifyGit allows a stash drop only after the exact verifying pipeline at the repository root", async () => {
-  const { repo } = await stashRepo(),
-    sub = `${repo}/sub`;
-  for (const [command, cwd] of [
-    [VERIFIED_DROP, repo],
-    [
+/** One stash-drop scenario, with the command and working directory it needs. */
+interface StashDropCase {
+  /** The scenario name, shown as the test name. */
+  readonly name: string;
+  /** The command and the working directory the classification runs in. */
+  readonly build: (repo: string, sub: string) => [command: string, cwd: string];
+}
+
+const ALLOWED_STASH_DROP_CASES: readonly StashDropCase[] = [
+  {
+    name: "the exact verifying pipeline at the repository root",
+    build: (repo) => [VERIFIED_DROP, repo],
+  },
+  {
+    name: "the long flag form with a numeric stash index",
+    build: (repo) => [
       "git stash show --include-untracked --patch --binary 1 | git apply --reverse --check && git stash drop -q stash@{1}",
       repo,
     ],
-    ["git stash show -u -p --binary | git apply -R --check && git stash drop", repo],
-    [`cd ${repo} && ${VERIFIED_DROP}`, sub],
-    [
+  },
+  {
+    name: "the short flag form without a stash index",
+    build: (repo) => [
+      "git stash show -u -p --binary | git apply -R --check && git stash drop",
+      repo,
+    ],
+  },
+  {
+    name: "a cd to the repository root before the pipeline",
+    build: (repo, sub) => [`cd ${repo} && ${VERIFIED_DROP}`, sub],
+  },
+  {
+    name: "git -C pointing at the repository root from a subdirectory",
+    build: (_repo, sub) => [
       `git -C .. stash show -p --binary -u | git -C .. apply --check -R && git -C .. stash drop`,
       sub,
     ],
-    [`git status && ${VERIFIED_DROP}`, repo],
-  ] as [string, string][]) {
-    assert.equal(classifyGit(command, cwd), null, command);
-  }
-  for (const [command, cwd] of [
-    [VERIFIED_DROP, sub],
-    [
+  },
+  {
+    name: "a status check before the pipeline",
+    build: (repo) => [`git status && ${VERIFIED_DROP}`, repo],
+  },
+];
+
+const BLOCKED_STASH_DROP_CASES: readonly StashDropCase[] = [
+  {
+    name: "the exact verifying pipeline outside the repository root",
+    build: (_repo, sub) => [VERIFIED_DROP, sub],
+  },
+  {
+    name: "a drop of a different stash than the one that was shown",
+    build: (repo) => [
       "git stash show -p --binary -u stash@{0} | git apply --check -R && git stash drop stash@{1}",
       repo,
     ],
-    [
+  },
+  {
+    name: "a show without the untracked flag",
+    build: (repo) => [
       "git stash show -p --binary stash@{0} | git apply --check -R && git stash drop stash@{0}",
       repo,
     ],
-    ["git stash show -p -u stash@{0} | git apply --check -R && git stash drop stash@{0}", repo],
-    [
+  },
+  {
+    name: "a show without the patch flag",
+    build: (repo) => [
+      "git stash show -p -u stash@{0} | git apply --check -R && git stash drop stash@{0}",
+      repo,
+    ],
+  },
+  {
+    name: "a show without the binary flag",
+    build: (repo) => [
       "git stash show --binary -u stash@{0} | git apply --check -R && git stash drop stash@{0}",
       repo,
     ],
-    ["git stash show -p --binary -u -- root.txt | git apply --check -R && git stash drop", repo],
-    ["git stash show -p --binary -u -R | git apply --check -R && git stash drop", repo],
-    ["git stash show -p --binary -u | git apply --check && git stash drop", repo],
-    ["git stash show -p --binary -u | git apply -R && git stash drop", repo],
-    [
+  },
+  {
+    name: "a show restricted to a path",
+    build: (repo) => [
+      "git stash show -p --binary -u -- root.txt | git apply --check -R && git stash drop",
+      repo,
+    ],
+  },
+  {
+    name: "a show with a stray -R flag",
+    build: (repo) => [
+      "git stash show -p --binary -u -R | git apply --check -R && git stash drop",
+      repo,
+    ],
+  },
+  {
+    name: "an apply without the check flag",
+    build: (repo) => ["git stash show -p --binary -u | git apply --check && git stash drop", repo],
+  },
+  {
+    name: "an apply without the reverse flag",
+    build: (repo) => ["git stash show -p --binary -u | git apply -R && git stash drop", repo],
+  },
+  {
+    name: "an apply with an extra exclude option",
+    build: (repo) => [
       "git stash show -p --binary -u | git apply --check -R --exclude=root.txt && git stash drop",
       repo,
     ],
-    ["git stash show -p --binary -u | git apply --check -R other.patch && git stash drop", repo],
-    ["git stash show -p --binary -u | git apply --check -R < other.patch && git stash drop", repo],
-    ["git stash show -p --binary -u |& git apply --check -R && git stash drop", repo],
-    ["git stash show -p --binary -u | git apply --check -R || git stash drop", repo],
-    ["git stash show -p --binary -u | git apply --check -R; git stash drop", repo],
-    ["! git stash show -p --binary -u | git apply --check -R && git stash drop", repo],
-    ["true || git stash show -p --binary -u | git apply --check -R && git stash drop", repo],
-    ["git stash show -p --binary -u | git apply --check -R && (git stash drop)", repo],
-    ["git stash show -p --binary -u | git apply --check -R && echo $(git stash drop)", repo],
-    ["git stash show -p --binary -u | cat | git apply --check -R && git stash drop", repo],
-    [
+  },
+  {
+    name: "an apply with a patch file argument",
+    build: (repo) => [
+      "git stash show -p --binary -u | git apply --check -R other.patch && git stash drop",
+      repo,
+    ],
+  },
+  {
+    name: "an apply that reads from a redirect",
+    build: (repo) => [
+      "git stash show -p --binary -u | git apply --check -R < other.patch && git stash drop",
+      repo,
+    ],
+  },
+  {
+    name: "a pipeline that also writes to standard error",
+    build: (repo) => [
+      "git stash show -p --binary -u |& git apply --check -R && git stash drop",
+      repo,
+    ],
+  },
+  {
+    name: "a pipeline joined with or",
+    build: (repo) => [
+      "git stash show -p --binary -u | git apply --check -R || git stash drop",
+      repo,
+    ],
+  },
+  {
+    name: "a pipeline joined with a semicolon",
+    build: (repo) => ["git stash show -p --binary -u | git apply --check -R; git stash drop", repo],
+  },
+  {
+    name: "a negated pipeline",
+    build: (repo) => [
+      "! git stash show -p --binary -u | git apply --check -R && git stash drop",
+      repo,
+    ],
+  },
+  {
+    name: "a pipeline behind a short circuit",
+    build: (repo) => [
+      "true || git stash show -p --binary -u | git apply --check -R && git stash drop",
+      repo,
+    ],
+  },
+  {
+    name: "a drop inside a subshell",
+    build: (repo) => [
+      "git stash show -p --binary -u | git apply --check -R && (git stash drop)",
+      repo,
+    ],
+  },
+  {
+    name: "a drop inside a command substitution",
+    build: (repo) => [
+      "git stash show -p --binary -u | git apply --check -R && echo $(git stash drop)",
+      repo,
+    ],
+  },
+  {
+    name: "an extra stage in the pipeline",
+    build: (repo) => [
+      "git stash show -p --binary -u | cat | git apply --check -R && git stash drop",
+      repo,
+    ],
+  },
+  {
+    name: "a refs/stash reference instead of a stash index",
+    build: (repo) => [
       "git stash show -p --binary -u refs/stash | git apply --check -R && git stash drop refs/stash",
       repo,
     ],
-    ["git -C sub stash show -p --binary -u | git apply --check -R && git stash drop", repo],
-    ["GIT_DIR=x git stash show -p --binary -u | git apply --check -R && git stash drop", repo],
-  ] as [string, string][]) {
+  },
+  {
+    name: "a show that changes directory to a subdirectory",
+    build: (repo) => [
+      "git -C sub stash show -p --binary -u | git apply --check -R && git stash drop",
+      repo,
+    ],
+  },
+  {
+    name: "a show with a GIT_DIR assignment",
+    build: (repo) => [
+      "GIT_DIR=x git stash show -p --binary -u | git apply --check -R && git stash drop",
+      repo,
+    ],
+  },
+];
+
+test.each(ALLOWED_STASH_DROP_CASES)(
+  "classifyGit allows a stash drop after $name",
+  async ({ build }) => {
+    const { repo } = await stashRepo(),
+      sub = `${repo}/sub`,
+      [command, cwd] = build(repo, sub);
+    assert.equal(classifyGit(command, cwd), null, command);
+  },
+);
+
+test.each(BLOCKED_STASH_DROP_CASES)(
+  "classifyGit blocks a stash drop after $name",
+  async ({ build }) => {
+    const { repo } = await stashRepo(),
+      sub = `${repo}/sub`,
+      [command, cwd] = build(repo, sub);
     assert.equal(classifyGit(command, cwd), SHELL_MSG.stashDrop, command);
-  }
-});
+  },
+);
 
 test("the verified stash drop runs only when every stashed change is already in the working tree", async () => {
   const { execFileSync } = await import("node:child_process"),
