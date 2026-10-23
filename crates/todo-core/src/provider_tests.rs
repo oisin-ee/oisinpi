@@ -1,13 +1,13 @@
 //! Provider policy through public operations, independent of a runtime executor.
 use crate::*;
 
-fn context() -> MutationContext {
+pub(crate) fn context() -> MutationContext {
     MutationContext {
         session_id: "session".to_owned(),
         mutation_id: "mutation".to_owned(),
     }
 }
-fn request(op: Operation, id: &str) -> Request {
+pub(crate) fn request(op: Operation, id: &str) -> Request {
     Request {
         op,
         items: None,
@@ -16,16 +16,17 @@ fn request(op: Operation, id: &str) -> Request {
         contract: None,
         start: None,
         evidence: None,
+        description: None,
     }
 }
-fn execution(id: &str) -> ExecutionRef {
+pub(crate) fn execution(id: &str) -> ExecutionRef {
     ExecutionRef {
         executor: "dogsled".to_owned(),
         owner_id: "owner".to_owned(),
         request_id: id.to_owned(),
     }
 }
-fn pending() -> TodoList {
+pub(crate) fn pending() -> TodoList {
     let mut list = init(vec!["Build".to_owned()]).unwrap();
     let mut update = request(Operation::Update, "Build");
     update.contract = Some(ContractDraft {
@@ -54,13 +55,13 @@ fn pending() -> TodoList {
         .contract_entry_id = "entry".to_owned();
     list
 }
-fn input(list: &TodoList, id: &str) -> ClaimInput {
+pub(crate) fn input(list: &TodoList, id: &str) -> ClaimInput {
     ClaimInput {
         expected: list.tasks[0].unit.as_ref().unwrap().reference.clone(),
         execution: execution(id),
     }
 }
-fn returned(binding: TaskBinding) -> Settlement {
+pub(crate) fn returned(binding: TaskBinding) -> Settlement {
     Settlement::Bound {
         version: 1,
         event_id: "returned-1".to_owned(),
@@ -111,10 +112,6 @@ fn exact_claim_replay_and_explicit_acceptance() {
     );
     let mut done = request(Operation::Done, &input.expected.unit_id);
     done.evidence = Some("reviewed diff".to_owned());
-    assert!(
-        apply(claimed.list.clone(), done.clone(), &context()).is_err(),
-        "held worker cannot complete"
-    );
     let event = returned(claimed.value.binding);
     let released = settle(claimed.list, &event, "session").unwrap();
     assert_eq!(
@@ -229,11 +226,14 @@ fn protected_calls_and_held_workers_cannot_be_replaced() {
     assert!(
         apply(
             claimed.list.clone(),
-            request(Operation::Drop, id),
+            Request {
+                task: None,
+                ..request(Operation::Drop, id)
+            },
             &context()
         )
         .is_err(),
-        "held drop rejected"
+        "untargeted drop cannot release a held unit"
     );
     let mut init = request(Operation::Init, id);
     init.task = None;
@@ -280,6 +280,7 @@ fn held_child_blocks_parent_cascade_and_keeps_explicit_parent_review() {
     let mut parent = init(vec!["Outcome".to_owned()]).unwrap();
     parent.tasks[0].subtasks.push(Subtask {
         content: child.content,
+        description: child.description,
         status: child.status,
         unit: child.unit,
     });
@@ -292,11 +293,17 @@ fn held_child_blocks_parent_cascade_and_keeps_explicit_parent_review() {
     assert!(
         apply(
             claimed.list.clone(),
-            request(Operation::Drop, "Outcome"),
-            &context()
+            Request {
+                task: None,
+                ..request(Operation::Drop, "Outcome")
+            },
+            &MutationContext {
+                mutation_id: "migrate".to_owned(),
+                ..context()
+            }
         )
         .is_err(),
-        "held child blocks parent cascade"
+        "untargeted drop cannot cascade into a held child"
     );
     let released = settle(claimed.list, &returned(claimed.value.binding), "session").unwrap();
     let mut done = request(Operation::Done, &input.expected.unit_id);

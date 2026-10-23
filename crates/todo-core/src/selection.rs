@@ -3,6 +3,7 @@ use crate::{ContractDraft, MutationContext, Request, Status, Task, TodoError, To
 
 pub(crate) struct Selected<'a> {
     pub content: &'a str,
+    pub description: &'a mut Option<String>,
     pub status: &'a mut Status,
     pub unit: &'a mut Option<Unit>,
     pub leaf: bool,
@@ -71,6 +72,7 @@ fn at(list: &mut TodoList, position: Position) -> Result<Selected<'_>, TodoError
             let task = list.tasks.get_mut(index).ok_or(TodoError::MissingTask)?;
             Ok(Selected {
                 content: &task.content,
+                description: &mut task.description,
                 status: &mut task.status,
                 unit: &mut task.unit,
                 leaf: task.subtasks.is_empty(),
@@ -84,6 +86,7 @@ fn at(list: &mut TodoList, position: Position) -> Result<Selected<'_>, TodoError
                 .ok_or(TodoError::MissingTask)?;
             Ok(Selected {
                 content: &child.content,
+                description: &mut child.description,
                 status: &mut child.status,
                 unit: &mut child.unit,
                 leaf: true,

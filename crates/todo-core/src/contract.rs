@@ -129,6 +129,9 @@ pub struct Unit {
     pub attempted_revision: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub imported: Option<crate::ImportedUnit>,
+    /// Executions whose binding the owning lead released by closing the unit.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub released: Vec<ExecutionRef>,
 }
 
 /// Trusted runtime identity, separate from agent-authored tool parameters.
@@ -186,6 +189,7 @@ impl Unit {
             accepted_events: vec![],
             attempted_revision: None,
             imported: None,
+            released: vec![],
         }
     }
 

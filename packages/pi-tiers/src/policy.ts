@@ -15,7 +15,9 @@ interface Target {
 
 const ZERO = 0,
   ONE = 1,
+  INTERNAL = 500,
   BAD_GATEWAY = 502,
+  GATEWAY_TIMEOUT = 504,
   UNAVAILABLE = 503,
   BAD_REQUEST = 400,
   UNAUTHORIZED = 401,
@@ -54,6 +56,17 @@ const ZERO = 0,
       )
     ) {
       return "quota";
+    }
+    // A provider-side failure of one target (HTTP 500/504, an empty upstream stream) is not
+    // It is not the request's fault, so the next target in the tier may succeed.
+    if (
+      status === INTERNAL ||
+      status === GATEWAY_TIMEOUT ||
+      /\b(?:status|code|HTTP)\s*:?\s*(?:500|504)\b|internal_server_error|server_error|empty_stream/iu.test(
+        message,
+      )
+    ) {
+      return "transient";
     }
     return /overloaded|timeout|timed out|websocket.*1006|server_busy|retry after/iu.test(message)
       ? "transient"

@@ -1,5 +1,21 @@
 # @oisin-ee/pi-prewalk
 
+## 0.10.2
+
+No changes in this release.
+
+## 0.10.1
+
+No changes in this release.
+
+## 0.10.0
+
+No changes in this release.
+
+## 0.9.3
+
+No changes in this release.
+
 ## 0.9.2
 
 No changes in this release.

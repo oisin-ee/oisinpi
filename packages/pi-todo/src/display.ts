@@ -1,7 +1,7 @@
-import type { Subtask, TodoList } from "./wasm.ts";
+import type { Subtask, TodoList, TodoSection } from "./wasm.ts";
+import { sections, view } from "./wasm.ts";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { TodoView } from "./embedded.ts";
-import { view } from "./wasm.ts";
 
 /** Host-owned layout and rendering services for an inline todo view. */
 interface ViewHost {
@@ -25,6 +25,8 @@ interface TodoDisplay {
   readonly summary: string;
   readonly current: string;
   readonly text: string;
+  /** Status groups owned by the core: in_progress, pending, completed, abandoned. */
+  readonly sections: readonly TodoSection[];
   readonly state: unknown;
   readonly createView: (host: ViewHost) => HostedView;
 }
@@ -58,6 +60,7 @@ const emptyCount = 0,
       createView: (host) => new TodoView(list, host),
       current,
       empty: list.tasks.length === emptyCount,
+      sections: sections(list),
       state: list,
       summary: text.split("\n").at(headerIndex) ?? "",
       text,

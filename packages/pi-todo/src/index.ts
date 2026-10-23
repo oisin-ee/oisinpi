@@ -39,7 +39,7 @@ export default function piTodo(pi: TodoAPI): void {
   provider.register();
   registerGate(pi, provider);
   pi.registerTool({
-    description: `Keep branch-local outcomes and executable contracts. Use returned IDs, not labels. Draft creation is pending. Start one complete self-assigned leaf; workers require their assigned profile through the executor. Update replaces pending contract fields. Done requires acceptance evidence. Parents require explicit integration review after children close. ${workUnitGuidance}`,
+    description: `Keep branch-local outcomes and executable contracts. Use returned IDs, not labels. Draft creation is pending. Start one complete self-assigned leaf; workers require their assigned profile through the executor. Update replaces pending contract fields and may set or clear an open item's description. Done takes a short note. Parents require explicit integration review after children close. ${workUnitGuidance}`,
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const result = provider.run(params, ctx);
       work.publish(ctx);

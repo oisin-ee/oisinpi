@@ -36,7 +36,7 @@ Pi-todo implements contracts, local execution gates, provider handoff, worker im
 }
 ```
 
-The optional `start` selector makes creation and activation atomic. Without it, creation leaves drafts pending. Strings create incomplete drafts. A parent uses `{content, subtasks}` and cannot execute.
+The optional `start` selector makes creation and activation atomic. Without it, creation leaves drafts pending. Strings create incomplete drafts. A parent uses `{content, subtasks}` and cannot execute. Every outcome and draft accepts an optional `description`: `content` stays a short headline (aim under 60 characters, imperative) and the description holds context, approach, or acceptance detail in one or two sentences. Strings carry none, and a blank description counts as none.
 
 Local keys resolve prerequisite references within the same creation request. After creation, selectors use returned unit IDs. Names remain display labels.
 
@@ -53,7 +53,7 @@ An acceptance requirement can instead use `{kind:"review", artifact, criterion}`
 | `drop`            | Abandon open work without cancelling an external process                         |
 | `view`            | Read the current branch without persistence                                      |
 
-`update` replaces the draft object rather than merging individual fields. A domain change increments the revision. A status-only change preserves the revision and its origin.
+`update` replaces the draft object rather than merging individual fields. `update` may instead, or also, send `description` to set it on open work; a blank value clears it. A description-only update never bumps the revision, and no description change alters `content`-based selection. A domain change increments the revision. A status-only change preserves the revision and its origin.
 
 A locally active unit prevents replacement with `init`. Its contract cannot change. Another local leaf cannot start, even with disjoint ownership. A worker assignment uses `{kind:"worker", profile:"general"}`. `start` rejects worker assignments without launching anything.
 
@@ -125,4 +125,4 @@ Legacy flat and hierarchical snapshots retain their recorded status and display.
 
 Exact-content selectors apply only before migration. Legacy `in_progress` does not authorize execution. Open legacy work requires `update`, then explicit `start`. An atomic `update` with `start` is also valid. Completed legacy work never reopens automatically.
 
-The shared presentation protocol remains version 2. Pi-todo shows assignment, profile, scope, revision, and parent review state. It stores no queue, host, pane, process, retry, or cancellation state.
+The shared presentation protocol is version 3: the version 2 envelope plus `display.sections`, four typed status groups (`in_progress`, `pending`, `completed`, `abandoned`) in that order; each item and subtask also carries its optional `description` (additive, so the version stays 3). Pi-todo no longer answers version 2 requests; an incompatible presenter falls back to standalone todos. Pi-todo shows assignment, profile, scope, revision, and parent review state. It stores no queue, host, pane, process, retry, or cancellation state.

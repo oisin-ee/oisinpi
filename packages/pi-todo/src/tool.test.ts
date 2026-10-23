@@ -31,6 +31,21 @@ describe("executable todo contracts", () => {
   });
 });
 
+describe("lead closure", () => {
+  it("completes an unstarted leaf with a note and requires the note", { timeout: 5000 }, () => {
+    expect.hasAssertions();
+    const test = fixture(),
+      id = firstId(test.call({ items: [{ content: "Build", contract: contract() }], op: "init" }));
+    expect(() => test.call({ op: "done", task: id })).toThrow("ACCEPTANCE_REQUIRED");
+    expect(
+      test.call({ evidence: "merged elsewhere", op: "done", task: id }).tasks.at(first),
+    ).toMatchObject({
+      status: "completed",
+      unit: { acceptanceEvidence: "merged elsewhere" },
+    });
+  });
+});
+
 describe("closed revisions", () => {
   it("does not reopen completed work", { timeout: 5000 }, () => {
     expect.hasAssertions();
@@ -74,9 +89,6 @@ describe("contract revisions", () => {
       revision: 2,
       unitId: id,
     });
-    expect(() => test.call({ evidence: "not started", op: "done", task: id })).toThrow(
-      "ACCEPTANCE_REQUIRED",
-    );
     test.call({ op: "start", task: id });
     expect(() => test.call({ op: "done", task: id })).toThrow("ACCEPTANCE_REQUIRED");
     expect(
@@ -117,9 +129,6 @@ describe("branch-local migration", () => {
       id = firstId(list);
     expect(list.tasks.map((task) => task.status)).toStrictEqual(["in_progress", "completed"]);
     expect(list.tasks.at(first)?.unit?.localSessionId).toBeUndefined();
-    expect(() => test.call({ evidence: "old string", op: "done", task: id })).toThrow(
-      "ACCEPTANCE_REQUIRED",
-    );
     test.call({ op: "start", task: id });
     test.call({ op: "drop", task: id });
     expect(test.call({ op: "view" }).tasks.at(second)?.status).toBe("completed");

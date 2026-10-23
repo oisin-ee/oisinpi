@@ -1,5 +1,23 @@
 # @oisin-ee/pi-tiers
 
+## 0.10.2
+
+No changes in this release.
+
+## 0.10.1
+
+No changes in this release.
+
+## 0.10.0
+
+No changes in this release.
+
+## 0.9.3
+
+### Patch Changes
+
+- [#28](https://github.com/oisin-ee/oisinpi/pull/28) [`6f6e309`](https://github.com/oisin-ee/oisinpi/commit/6f6e3092eaec85e4f47c52ec652db359d7ddd78f) Thanks [@momo-momokaya](https://github.com/apps/momo-momokaya)! - Treat a provider-side failure of one target as transient, so the tier moves to its next target instead of stopping. This covers HTTP 500 and 504, `internal_server_error`, `server_error` and `empty_stream`.
+
 ## 0.9.2
 
 ### Patch Changes

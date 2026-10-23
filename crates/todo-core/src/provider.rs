@@ -103,18 +103,6 @@ pub fn protect(before: &TodoList, after: &TodoList, leases: &[UnitRef]) -> Resul
     Ok(())
 }
 
-pub(crate) fn has_review_evidence(unit: &Unit) -> bool {
-    unit.binding.is_none()
-        && unit.frozen_export_json.as_ref().is_some_and(|json| {
-            TaskExport::parse(json).is_ok_and(|export| export.contract.r#ref == unit.reference)
-        })
-        && unit.evidence.iter().any(|evidence| {
-            unit.accepted_events.iter().any(|event| {
-                (&event.origin, &event.execution) == (&unit.reference, &evidence.execution)
-            })
-        })
-}
-
 fn select<'a>(list: &'a mut TodoList, id: &str) -> Result<Selected<'a>, TodoError> {
     selected(
         list,
@@ -126,6 +114,7 @@ fn select<'a>(list: &'a mut TodoList, id: &str) -> Result<Selected<'a>, TodoErro
             contract: None,
             start: None,
             evidence: None,
+            description: None,
         },
     )
     .map_err(|cause| error(&format!("UNIT_NOT_FOUND: {cause}")))
@@ -431,6 +420,13 @@ pub fn settle(
         });
     }
     matching_origin(unit, &identity.origin, session_id)?;
+    if unit.binding.is_none() && unit.released.contains(&identity.execution) {
+        return Ok(SettlementChange {
+            list,
+            persist: false,
+            value: SettlementResult { applied: false },
+        });
+    }
     let Selected { unit, status, .. } = select(&mut list, &identity.origin.unit_id)?;
     let unit = unit.as_mut().ok_or_else(|| error("STALE_ORIGIN"))?;
     let applied = release(unit, status, input, identity)?;

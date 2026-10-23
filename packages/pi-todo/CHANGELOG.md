@@ -1,5 +1,27 @@
 # @oisin-ee/pi-todo
 
+## 0.10.2
+
+### Patch Changes
+
+- [#35](https://github.com/oisin-ee/oisinpi/pull/35) [`a4554dc`](https://github.com/oisin-ee/oisinpi/commit/a4554dc2e64ba6e82fe5731992ba26c0c31c59b2) Thanks [@momo-momokaya](https://github.com/apps/momo-momokaya)! - A worker can call `dogsled done` after it closes its seeded todo leaf. Before, the todo gate blocked `mcp__dogsled__done`, so a finished worker could not report done.
+
+## 0.10.1
+
+### Patch Changes
+
+- [#33](https://github.com/oisin-ee/oisinpi/pull/33) [`ac2e931`](https://github.com/oisin-ee/oisinpi/commit/ac2e931bf8d907eced3d075ebae2e9707713ea6f) Thanks [@momo-momokaya](https://github.com/apps/momo-momokaya)! - The owning lead can close any open leaf with `done` and a short note, or with `drop`. Closing a leaf that a worker holds clears the binding, records the execution as released, and frees its paths. A late settlement for a released execution is a no-op.
+
+## 0.10.0
+
+### Minor Changes
+
+- [#30](https://github.com/oisin-ee/oisinpi/pull/30) [`5ab2bcc`](https://github.com/oisin-ee/oisinpi/commit/5ab2bcc44215d4f22e319d93dc57e8af12499b28) Thanks [@momo-momokaya](https://github.com/apps/momo-momokaya)! - Publish todo status groups as typed data. The work protocol is now version 3: the version 2 snapshot plus `display.sections`, four sections (`in_progress`, `pending`, `completed`, `abandoned`) that each carry a count and items with text, review flag, contract summary, and subtasks. Pi-todo no longer answers version 2 requests, so an older presenter falls back to standalone todos. Todos also gain an optional `description` on outcomes and subtasks: `content` is now a short headline and the description holds the detail. `update` sets or clears it, `view` prints it under the headline, and `display.sections` carries it for presenters; the Pi widget still shows headlines only.
+
+## 0.9.3
+
+No changes in this release.
+
 ## 0.9.2
 
 No changes in this release.

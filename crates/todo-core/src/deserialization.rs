@@ -54,22 +54,25 @@ impl<'de> Visitor<'de> for TaskVisitor {
 
     fn visit_map<M: MapAccess<'de>>(self, mut map: M) -> Result<Self::Value, M::Error> {
         let (mut content, mut status, mut subtasks, mut unit) = (None, None, None, None);
+        let mut description = None;
         while let Some(key) = map.next_key::<String>()? {
             match key.as_str() {
                 "content" => field(&mut map, &mut content, "content")?,
+                "description" => field(&mut map, &mut description, "description")?,
                 "status" => field(&mut map, &mut status, "status")?,
                 "subtasks" => field(&mut map, &mut subtasks, "subtasks")?,
                 "unit" => field(&mut map, &mut unit, "unit")?,
                 _ => {
                     return Err(de::Error::unknown_field(
                         &key,
-                        &["content", "status", "subtasks", "unit"],
+                        &["content", "description", "status", "subtasks", "unit"],
                     ));
                 }
             }
         }
         Ok(Task {
             content: content.ok_or_else(|| de::Error::missing_field("content"))?,
+            description: description.unwrap_or_default(),
             status: status.ok_or_else(|| de::Error::missing_field("status"))?,
             subtasks: subtasks.unwrap_or_default(),
             unit: unit.unwrap_or_default(),
@@ -93,21 +96,24 @@ impl<'de> Visitor<'de> for SubtaskVisitor {
 
     fn visit_map<M: MapAccess<'de>>(self, mut map: M) -> Result<Self::Value, M::Error> {
         let (mut content, mut status, mut unit) = (None, None, None);
+        let mut description = None;
         while let Some(key) = map.next_key::<String>()? {
             match key.as_str() {
                 "content" => field(&mut map, &mut content, "content")?,
+                "description" => field(&mut map, &mut description, "description")?,
                 "status" => field(&mut map, &mut status, "status")?,
                 "unit" => field(&mut map, &mut unit, "unit")?,
                 _ => {
                     return Err(de::Error::unknown_field(
                         &key,
-                        &["content", "status", "unit"],
+                        &["content", "description", "status", "unit"],
                     ));
                 }
             }
         }
         Ok(Subtask {
             content: content.ok_or_else(|| de::Error::missing_field("content"))?,
+            description: description.unwrap_or_default(),
             status: status.ok_or_else(|| de::Error::missing_field("status"))?,
             unit: unit.unwrap_or_default(),
         })
@@ -131,6 +137,7 @@ impl<'de> Visitor<'de> for RequestVisitor {
     fn visit_map<M: MapAccess<'de>>(self, mut map: M) -> Result<Self::Value, M::Error> {
         let (mut op, mut items, mut task, mut parent) = (None, None, None, None);
         let (mut contract, mut start, mut evidence) = (None, None, None);
+        let mut description = None;
         while let Some(key) = map.next_key::<String>()? {
             match key.as_str() {
                 "op" => field(&mut map, &mut op, "op")?,
@@ -140,11 +147,19 @@ impl<'de> Visitor<'de> for RequestVisitor {
                 "contract" => field(&mut map, &mut contract, "contract")?,
                 "start" => field(&mut map, &mut start, "start")?,
                 "evidence" => field(&mut map, &mut evidence, "evidence")?,
+                "description" => field(&mut map, &mut description, "description")?,
                 _ => {
                     return Err(de::Error::unknown_field(
                         &key,
                         &[
-                            "op", "items", "task", "parent", "contract", "start", "evidence",
+                            "op",
+                            "items",
+                            "task",
+                            "parent",
+                            "contract",
+                            "start",
+                            "evidence",
+                            "description",
                         ],
                     ));
                 }
@@ -158,6 +173,7 @@ impl<'de> Visitor<'de> for RequestVisitor {
             contract: contract.unwrap_or_default(),
             start: start.unwrap_or_default(),
             evidence: evidence.unwrap_or_default(),
+            description: description.unwrap_or_default(),
         })
     }
 }
