@@ -1,5 +1,11 @@
 # @oisin-ee/pi-todo
 
+## 0.11.0
+
+### Patch Changes
+
+- [`0e37d82`](https://github.com/oisin-ee/oisinpi/commit/0e37d8259d4a7cb4cffbeccfce2a36caa0274b6e) Thanks [@momo-momokaya[bot]](https://github.com/momo-momokaya%5Bbot%5D)! - Skip the todo activation check for the planning selections `tier/plan-claude` and `tier/plan-gpt`. Every other selection still needs an active local unit.
+
 ## 0.10.2
 
 ### Patch Changes
