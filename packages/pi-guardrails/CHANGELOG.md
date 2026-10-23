@@ -1,5 +1,11 @@
 # @oisin-ee/pi-guardrails
 
+## 0.11.1
+
+### Patch Changes
+
+- [`f1837f2`](https://github.com/oisin-ee/oisinpi/commit/f1837f28bc25fb00feebf7c47509db9bbd3b897c) Thanks [@momo-momokaya[bot]](https://github.com/momo-momokaya%5Bbot%5D)! - Stop restricting a model by its identity. The guardrails no longer ban writes, edits, Git, or the workflow tools for the planning selections `tier/plan-claude` and `tier/plan-gpt`. Every model keeps the same policy set. Planning restrictions belong to Plannotator, which owns plan mode.
+
 ## 0.11.0
 
 ### Minor Changes
