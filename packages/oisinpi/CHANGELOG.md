@@ -1,5 +1,15 @@
 # @oisin-ee/oisinpi
 
+## 0.12.0
+
+### Patch Changes
+
+- Updated dependencies [[`7fcdc45`](https://github.com/oisin-ee/oisinpi/commit/7fcdc45f08c065faf38c3841c0b2d2133ad9322f)]:
+  - @oisin-ee/pi-todo@0.12.0
+  - @oisin-ee/pi-guardrails@0.12.0
+  - @oisin-ee/pi-prewalk@0.12.0
+  - @oisin-ee/pi-tiers@0.12.0
+
 ## 0.11.1
 
 ### Patch Changes

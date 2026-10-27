@@ -1,5 +1,13 @@
 # @oisin-ee/pi-guardrails
 
+## 0.12.0
+
+### Patch Changes
+
+- [#40](https://github.com/oisin-ee/oisinpi/pull/40) [`7fcdc45`](https://github.com/oisin-ee/oisinpi/commit/7fcdc45f08c065faf38c3841c0b2d2133ad9322f) Thanks [@momo-momokaya](https://github.com/apps/momo-momokaya)! - Continue plans approved in Dogsled plan mode through the existing todo tool in the same session. Listen for `dogsled:plan-approved` without additional configuration.
+
+  Document Dogsled plan mode as the owner of planning restrictions.
+
 ## 0.11.1
 
 ### Patch Changes
