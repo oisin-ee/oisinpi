@@ -1,6 +1,6 @@
 import { ownsTodo, settle } from "./lifecycle.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { PlannotatorHandoff } from "./plannotator.ts";
+import { PlanApprovedHandoff } from "./plan-approved.ts";
 import { TaskProvider } from "./provider.ts";
 import { TodoPresentation } from "./presentation.ts";
 import { TodoWork } from "./work.ts";
@@ -30,7 +30,7 @@ type TodoAPI = WorkHost &
  * @param {TodoAPI} pi The extension API methods used here.
  */
 export default function piTodo(pi: TodoAPI): void {
-  const handoff = new PlannotatorHandoff(pi),
+  const handoff = new PlanApprovedHandoff(pi),
     presentation = new TodoPresentation(),
     work = new TodoWork(pi, presentation),
     provider = new TaskProvider(pi),

@@ -105,24 +105,14 @@ Version 3 adds `display.sections` to the snapshot: four typed status groups (`in
 Pi-todo does not answer version 2 requests.
 Incompatible versions leave the standalone widget available. Rendering failures restore it without changing saved tasks.
 
-## Plannotator plans
+## Dogsled plans
 
-With Plannotator external execution, pi-todo continues approved plans in the same session.
-Add this setting to `~/.pi/agent/plannotator.json`:
-
-```json
-{
-  "executionMode": "external"
-}
-```
+Dogsled plan mode (`/plan` and `submit_plan`) emits `dogsled:plan-approved` when the user approves a plan.
+Pi-todo continues the approved plan in the same session. No setting is needed.
 
 After approval, the agent reads the current todo list and adds the remaining approved work before implementation.
 It preserves unrelated tasks and completed progress. Free-form plans do not need a special checklist format.
 The todo tool owns progress, persistence, reminders, and the shared work display.
-Plannotator returns to idle and does not maintain a second checklist or require `[DONE:n]` markers.
-
-This integration uses the supported `plannotator:plan-approved` event, verified with Plannotator `0.28.19`.
-It does not import Plannotator internals or change its code.
 Malformed events, a different working directory, or another owner of the `todo` tool stop the handoff with an error.
 
 ## Reminder

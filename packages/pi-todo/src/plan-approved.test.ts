@@ -1,10 +1,10 @@
-import type { PlanContext, PlanHost } from "./plannotator.ts";
+import type { PlanContext, PlanHost } from "./plan-approved.ts";
 import { describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { PlannotatorHandoff } from "./plannotator.ts";
+import { PlanApprovedHandoff } from "./plan-approved.ts";
 
 type Listener = (value: unknown) => void;
-const channel = "plannotator:plan-approved",
+const channel = "dogsled:plan-approved",
   oneCall = 1,
   firstMessage = 0,
   approved = {
@@ -45,7 +45,7 @@ const channel = "plannotator:plan-approved",
   ): {
     readonly ctx: PlanContext;
     readonly host: PlanHost;
-    readonly handoff: Readonly<PlannotatorHandoff>;
+    readonly handoff: Readonly<PlanApprovedHandoff>;
     readonly messages: readonly unknown[];
   } => {
     const messages: unknown[] = [],
@@ -74,7 +74,7 @@ const channel = "plannotator:plan-approved",
         sessionManager: { getBranch: () => [] },
         ui: { notify: vi.fn<() => void>(), setWidget: vi.fn<() => void>() },
       };
-    return { ctx, handoff: new PlannotatorHandoff(host), host, messages };
+    return { ctx, handoff: new PlanApprovedHandoff(host), host, messages };
   };
 
 describe("approved plan continuation", () => {
@@ -116,6 +116,20 @@ describe("approved plan continuation", () => {
     test.host.events.emit(channel, plan);
     expect(test.host.sendMessage).toHaveBeenCalledTimes(oneCall);
     expect(test.ctx.ui.setWidget).not.toHaveBeenCalled();
+    test.handoff.stop();
+  });
+});
+
+describe("approved plan continuation text", () => {
+  it("uses Dogsled plan mode without checklist markers", { timeout: 5000 }, () => {
+    expect.hasAssertions();
+    const test = fixture();
+    test.handoff.start(test.ctx);
+    test.host.events.emit(channel, approved);
+    expect(test.messages.at(firstMessage)).toContain(
+      "The user approved this plan in Dogsled plan mode. Continue execution in this session.",
+    );
+    expect(test.messages.at(firstMessage)).not.toContain("[DONE:");
     test.handoff.stop();
   });
 });
@@ -196,7 +210,7 @@ describe("handoff rejection", () => {
     test.host.events.emit(channel, value);
     expect(test.host.sendMessage).not.toHaveBeenCalled();
     expect(test.ctx.ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("Invalid Plannotator approval"),
+      expect.stringContaining("Invalid Dogsled plan approval"),
       "error",
     );
     test.handoff.stop();
