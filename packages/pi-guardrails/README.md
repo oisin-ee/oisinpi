@@ -19,7 +19,7 @@ The guardrails do not restrict a model by its identity. The planning selections 
 `tier/plan-gpt` keep the full policy set: a planning model may run Git commands, write and edit files,
 and use the workflow tools.
 
-Planning restrictions belong to Plannotator. It owns plan mode, and it blocks writes while it plans.
+Planning restrictions belong to Dogsled plan mode, which blocks writes outside markdown files while planning.
 
 ## pi
 

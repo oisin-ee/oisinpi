@@ -4,7 +4,7 @@ import type { WorkHost } from "./work.ts";
 import { ownsTodo } from "./lifecycle.ts";
 import { workUnitGuidance } from "./guidance.ts";
 
-/** The supported Plannotator external-execution event. */
+/** The supported Dogsled plan approval event. */
 interface ApprovedPlan {
   readonly cwd: string;
   readonly planFilePath: string;
@@ -39,8 +39,8 @@ const isApprovedPlan = (value: unknown): value is ApprovedPlan =>
    */
   continuation = (plan: ApprovedPlan): string =>
     [
-      "The user approved this plan in Plannotator. Continue execution in this session.",
-      "Use the todo tool as the only task tracker. Do not maintain Plannotator [DONE:n] markers.",
+      "The user approved this plan in Dogsled plan mode. Continue execution in this session.",
+      "Use the todo tool as the only task tracker.",
       "First call todo with op=view to inspect the current branch list.",
       "Before implementation, represent remaining outcomes with optional bounded subtasks in that list. Use parent plus exact task for child operations.",
       workUnitGuidance,
@@ -58,7 +58,7 @@ const isApprovedPlan = (value: unknown): value is ApprovedPlan =>
     ].join("\n");
 
 /** Owns the approval subscription, never the todo list or execution progress. */
-class PlannotatorHandoff {
+class PlanApprovedHandoff {
   readonly #host: PlanHost;
   #unsubscribe: (() => void) | undefined;
 
@@ -76,26 +76,23 @@ class PlannotatorHandoff {
    */
   public start(ctx: PlanContext): void {
     this.stop();
-    this.#unsubscribe = this.#host.events.on(
-      "plannotator:plan-approved",
-      (value: unknown): void => {
-        if (!isApprovedPlan(value)) {
-          ctx.ui.notify("pi-todo: Invalid Plannotator approval. No execution started.", "error");
-        } else if (value.cwd !== ctx.cwd) {
-          ctx.ui.notify(
-            "pi-todo: The approved plan belongs to another working directory. No execution started.",
-            "error",
-          );
-        } else if (ownsTodo(this.#host)) {
-          this.#host.sendMessage(
-            { content: continuation(value), customType: "todo-plan-approved", display: true },
-            { deliverAs: "followUp", triggerTurn: true },
-          );
-        } else {
-          ctx.ui.notify("pi-todo: Another extension owns todo. No execution started.", "error");
-        }
-      },
-    );
+    this.#unsubscribe = this.#host.events.on("dogsled:plan-approved", (value: unknown): void => {
+      if (!isApprovedPlan(value)) {
+        ctx.ui.notify("pi-todo: Invalid Dogsled plan approval. No execution started.", "error");
+      } else if (value.cwd !== ctx.cwd) {
+        ctx.ui.notify(
+          "pi-todo: The approved plan belongs to another working directory. No execution started.",
+          "error",
+        );
+      } else if (ownsTodo(this.#host)) {
+        this.#host.sendMessage(
+          { content: continuation(value), customType: "todo-plan-approved", display: true },
+          { deliverAs: "followUp", triggerTurn: true },
+        );
+      } else {
+        ctx.ui.notify("pi-todo: Another extension owns todo. No execution started.", "error");
+      }
+    });
   }
 
   /** Removes the previous session's listener before replacement or shutdown. */
@@ -105,5 +102,5 @@ class PlannotatorHandoff {
   }
 }
 
-export { PlannotatorHandoff };
+export { PlanApprovedHandoff };
 export type { PlanContext, PlanHost };
