@@ -1,5 +1,11 @@
 # @oisin-ee/pi-prewalk
 
+## 0.12.1
+
+### Patch Changes
+
+- [#42](https://github.com/oisin-ee/oisinpi/pull/42) [`2d9ac2b`](https://github.com/oisin-ee/oisinpi/commit/2d9ac2b60d36a1da10a8700e11ae19a4c3455436) Thanks [@momo-momokaya](https://github.com/apps/momo-momokaya)! - Size the prewalk checklist to the task. The plan prompt no longer asks for 5–9 todo items; it reuses the task's verified steps, or one item per distinct change or check.
+
 ## 0.12.0
 
 No changes in this release.
